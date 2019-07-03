@@ -7,6 +7,7 @@ import (
 
 	"github.com/gdamore/tcell"
 	"github.com/gdamore/tcell/views"
+	"github.com/ueokande/logbook/ui"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -62,16 +63,17 @@ func (app *App) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	if len(pods.Items) == 0 {
-		return nil
-	}
-	fmt.Printf("There are %d pods in the cluster\n", len(pods.Items))
 
-	title := &views.TextBar{}
-	title.SetCenter(fmt.Sprintf("Got %d pods", len(pods.Items)), tcell.StyleDefault)
+	l := ui.NewListView()
+	for _, p := range pods.Items {
+		item := ui.ListItem{
+			Text: p.Name,
+		}
+		l.AddItem(item)
+	}
 
 	app.SetOrientation(views.Vertical)
-	app.AddWidget(title, 0)
+	app.AddWidget(l, 0)
 
 	app.SetRootWidget(app)
 	if e := app.Application.Run(); e != nil {

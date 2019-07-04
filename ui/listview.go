@@ -5,16 +5,18 @@ import (
 	"github.com/gdamore/tcell/views"
 )
 
-type ListItem struct {
-	Text  string
-	Style tcell.Style
+type item struct {
+	text *views.Text
+	view *views.ViewPort
 }
 
 type ListView struct {
 	view     views.View
-	texts    []*views.Text
-	views    []*views.ViewPort
+	items    []item
 	selected int
+	changed  bool
+	width    int
+	height   int
 
 	views.WidgetWatchers
 }
@@ -23,73 +25,98 @@ func NewListView() *ListView {
 	return &ListView{}
 }
 
-func (w *ListView) AddItem(item ListItem) {
+func (w *ListView) AddItem(text string, style tcell.Style) {
 	v := &views.ViewPort{}
+	v.SetView(w.view)
 
 	t := &views.Text{}
-	t.SetText(item.Text)
-	t.SetStyle(item.Style)
+	t.SetText(text)
+	t.SetStyle(style)
 	t.SetView(v)
 	t.Watch(w)
 
-	w.views = append(w.views, v)
-	w.texts = append(w.texts, t)
+	i := item{text: t, view: v}
+	w.items = append(w.items, i)
 
+	w.changed = true
+	w.layout()
 	w.PostEventWidgetContent(w)
 }
 
 func (w *ListView) SelectAt(index int) {
-	if index < 0 || index >= len(w.texts) {
-		panic("SelectAt: out-of-index")
+	if index == w.selected {
+		return
+	}
+	if w.selected >= 0 {
+		i := w.items[w.selected]
+		i.text.SetStyle(i.text.Style().Reverse(false))
+	}
+	if index < 0 || index >= len(w.items) {
+		return
 	}
 
-	if w.selected > 0 {
-		t := w.texts[w.selected]
-		t.SetStyle(t.Style().Reverse(false))
-	}
-
-	t := w.texts[index]
-	t.SetStyle(t.Style().Reverse(false))
+	w.selected = index
+	i := w.items[index]
+	i.text.SetStyle(i.text.Style().Reverse(true))
 
 	w.PostEventWidgetContent(w)
 }
 
 func (w *ListView) Draw() {
-	for i, t := range w.texts {
-		textw, texth := t.Size()
-
-		v := w.views[i]
-		v.Resize(0, i, textw, texth)
-
-		t.Draw()
+	if w.view == nil {
+		return
+	}
+	if w.changed {
+		w.layout()
+	}
+	for _, i := range w.items {
+		i.text.Draw()
 	}
 }
 
 func (w *ListView) Resize() {
-	for _, t := range w.texts {
-		t.Resize()
-	}
+	w.layout()
 	w.PostEventWidgetResize(w)
 }
 
 func (w *ListView) HandleEvent(ev tcell.Event) bool {
+	switch ev.(type) {
+	case *views.EventWidgetContent:
+		w.changed = true
+		w.PostEventWidgetContent(w)
+		return true
+	}
+	for _, item := range w.items {
+		if item.text.HandleEvent(ev) {
+			return true
+		}
+	}
 	return false
+
 }
 
 func (w *ListView) SetView(view views.View) {
 	w.view = view
-	for _, v := range w.views {
-		v.SetView(view)
+	for _, item := range w.items {
+		item.view.SetView(view)
 	}
+	w.changed = true
 }
 
 func (w *ListView) Size() (int, int) {
-	var width int
-	for _, t := range w.texts {
-		tw, _ := t.Size()
-		if tw > width {
-			width = tw
+	return w.width, w.height
+}
+
+func (w *ListView) layout() {
+	w.width, w.height = 0, 0
+	for y, item := range w.items {
+		textw, texth := item.text.Size()
+		if textw > w.width {
+			w.width = textw
 		}
+		item.view.Resize(0, y, textw, texth)
+		item.text.Resize()
 	}
-	return width, len(w.texts)
+	w.height = len(w.items)
+	w.changed = false
 }

@@ -40,6 +40,7 @@ func NewApp(config *AppConfig) *App {
 	}
 
 	app.SetOrientation(views.Vertical)
+	app.AddWidget(app.podsView, 0)
 	app.SetRootWidget(app)
 
 	return app
@@ -89,11 +90,7 @@ func (app *App) SelectPrevPod() {
 
 func (app *App) AddPod(pod corev1.Pod) {
 	app.pods = append(app.pods, pod)
-
-	item := ui.ListItem{
-		Text: pod.Name,
-	}
-	app.podsView.AddItem(item)
+	app.podsView.AddItem(pod.Name, tcell.StyleDefault)
 }
 
 func (app *App) Run(ctx context.Context) error {
@@ -110,7 +107,7 @@ func (app *App) Run(ctx context.Context) error {
 	for _, p := range pods.Items {
 		app.AddPod(p)
 	}
-	app.AddWidget(app.podsView, 0)
+	app.podsView.SelectAt(0)
 
 	return app.Application.Run()
 }

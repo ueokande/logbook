@@ -11,9 +11,10 @@ type ListItem struct {
 }
 
 type ListView struct {
-	view  views.View
-	texts []*views.Text
-	views []*views.ViewPort
+	view     views.View
+	texts    []*views.Text
+	views    []*views.ViewPort
+	selected int
 
 	views.WidgetWatchers
 }
@@ -33,6 +34,22 @@ func (w *ListView) AddItem(item ListItem) {
 
 	w.views = append(w.views, v)
 	w.texts = append(w.texts, t)
+
+	w.PostEventWidgetContent(w)
+}
+
+func (w *ListView) SelectAt(index int) {
+	if index < 0 || index >= len(w.texts) {
+		panic("SelectAt: out-of-index")
+	}
+
+	if w.selected > 0 {
+		t := w.texts[w.selected]
+		t.SetStyle(t.Style().Reverse(false))
+	}
+
+	t := w.texts[index]
+	t.SetStyle(t.Style().Reverse(false))
 
 	w.PostEventWidgetContent(w)
 }

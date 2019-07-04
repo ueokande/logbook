@@ -2,12 +2,11 @@ package main
 
 import (
 	"context"
-	"fmt"
-	"os"
 
 	"github.com/gdamore/tcell"
 	"github.com/gdamore/tcell/views"
 	"github.com/ueokande/logbook/ui"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -17,20 +16,33 @@ type AppConfig struct {
 }
 
 type App struct {
-	views.BoxLayout
-	*views.Application
+	podsView *ui.ListView
 
-	namespace  string
-	kubeconfig string
+	namespace   string
+	kubeconfig  string
+	pods        []corev1.Pod
+	selectedPod int
+
+	*views.Application
+	views.BoxLayout
 }
 
 func NewApp(config *AppConfig) *App {
-	return &App{
+	podsView := ui.NewListView()
+
+	app := &App{
 		namespace:  config.Namespace,
 		kubeconfig: config.KubeConfig,
 
 		Application: new(views.Application),
+
+		podsView: podsView,
 	}
+
+	app.SetOrientation(views.Vertical)
+	app.SetRootWidget(app)
+
+	return app
 }
 
 func (app *App) HandleEvent(ev tcell.Event) bool {
@@ -47,10 +59,41 @@ func (app *App) HandleEvent(ev tcell.Event) bool {
 			case 'q':
 				app.Quit()
 				return true
+			case 'k':
+				app.SelectPrevPod()
+				return true
+			case 'j':
+				app.SelectNextPod()
+				return true
 			}
 		}
 	}
 	return app.BoxLayout.HandleEvent(ev)
+}
+
+func (app *App) SelectNextPod() {
+	app.selectedPod += 1
+	if app.selectedPod >= len(app.pods) {
+		app.selectedPod = 0
+	}
+	app.podsView.SelectAt(app.selectedPod)
+}
+
+func (app *App) SelectPrevPod() {
+	app.selectedPod -= 1
+	if app.selectedPod < 0 {
+		app.selectedPod = len(app.pods) - 1
+	}
+	app.podsView.SelectAt(app.selectedPod)
+}
+
+func (app *App) AddPod(pod corev1.Pod) {
+	app.pods = append(app.pods, pod)
+
+	item := ui.ListItem{
+		Text: pod.Name,
+	}
+	app.podsView.AddItem(item)
 }
 
 func (app *App) Run(ctx context.Context) error {
@@ -64,23 +107,10 @@ func (app *App) Run(ctx context.Context) error {
 		return err
 	}
 
-	l := ui.NewListView()
 	for _, p := range pods.Items {
-		item := ui.ListItem{
-			Text: p.Name,
-		}
-		l.AddItem(item)
+		app.AddPod(p)
 	}
+	app.AddWidget(app.podsView, 0)
 
-	app.SetOrientation(views.Vertical)
-	app.AddWidget(l, 0)
-
-	app.SetRootWidget(app)
-	if e := app.Application.Run(); e != nil {
-		fmt.Fprintln(os.Stderr, e.Error())
-		os.Exit(1)
-	}
-
-	return nil
-
+	return app.Application.Run()
 }

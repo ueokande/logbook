@@ -17,6 +17,7 @@ type AppConfig struct {
 
 type App struct {
 	podsView *ui.ListView
+	pager    *ui.Pager
 
 	namespace   string
 	kubeconfig  string
@@ -29,6 +30,8 @@ type App struct {
 
 func NewApp(config *AppConfig) *App {
 	podsView := ui.NewListView()
+	line := ui.NewVerticalLine(tcell.RuneVLine, tcell.StyleDefault)
+	pager := ui.NewPager()
 
 	app := &App{
 		namespace:  config.Namespace,
@@ -37,10 +40,14 @@ func NewApp(config *AppConfig) *App {
 		Application: new(views.Application),
 
 		podsView: podsView,
+		pager:    pager,
 	}
 
-	app.SetOrientation(views.Vertical)
-	app.AddWidget(app.podsView, 0)
+	app.SetOrientation(views.Horizontal)
+	app.AddWidget(podsView, 0.1)
+	app.AddWidget(line, 0)
+	app.AddWidget(pager, 0.9)
+
 	app.SetRootWidget(app)
 
 	return app
@@ -78,6 +85,9 @@ func (app *App) SelectNextPod() {
 		app.selectedPod = 0
 	}
 	app.podsView.SelectAt(app.selectedPod)
+
+	pod := app.pods[app.selectedPod]
+	app.pager.SetContent("Views logs on " + pod.Name)
 }
 
 func (app *App) SelectPrevPod() {
@@ -86,6 +96,9 @@ func (app *App) SelectPrevPod() {
 		app.selectedPod = len(app.pods) - 1
 	}
 	app.podsView.SelectAt(app.selectedPod)
+
+	pod := app.pods[app.selectedPod]
+	app.pager.SetContent("Views logs on " + pod.Name)
 }
 
 func (app *App) AddPod(pod corev1.Pod) {

@@ -27,6 +27,7 @@ type App struct {
 	namespace   string
 	pods        []corev1.Pod
 	selectedPod int
+	logworker   *Worker
 
 	*views.Application
 	views.BoxLayout
@@ -40,13 +41,14 @@ func NewApp(clientset *kubernetes.Clientset, config *AppConfig) *App {
 	app := &App{
 		clientset: clientset,
 
-		namespace: config.Namespace,
-
-		Application: new(views.Application),
-
 		podsView: podsView,
 		line:     line,
 		pager:    pager,
+
+		namespace: config.Namespace,
+		logworker: NewWorker(context.Background()),
+
+		Application: new(views.Application),
 	}
 
 	app.SetOrientation(views.Horizontal)
@@ -154,16 +156,19 @@ func (app *App) HidePager() {
 }
 
 func (app *App) StartTailLog(pod corev1.Pod) {
+	app.StopTailLog()
+
 	app.pager.ClearText()
-	go func() {
+	app.logworker.Start(func(ctx context.Context) error {
 		opts := &corev1.PodLogOptions{
 			Container: pod.Spec.Containers[0].Name,
 			Follow:    true,
 		}
 		req := app.clientset.CoreV1().Pods(pod.Namespace).GetLogs(pod.Name, opts)
+		req.Context(ctx)
 		r, err := req.Stream()
 		if err != nil {
-			return
+			return err
 		}
 		defer r.Close()
 
@@ -172,10 +177,16 @@ func (app *App) StartTailLog(pod corev1.Pod) {
 			app.pager.WriteText(s.Text() + "\n")
 			app.Refresh()
 		}
-	}()
+		return s.Err()
+	})
 }
 
 func (app *App) StopTailLog() {
+	err := app.logworker.Stop()
+	if err != nil && err != context.Canceled {
+		panic(err)
+	}
+
 }
 
 func (app *App) Run(ctx context.Context) error {

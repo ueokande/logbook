@@ -75,6 +75,18 @@ func (app *App) HandleEvent(ev tcell.Event) bool {
 		case tcell.KeyCtrlN:
 			app.SelectNextPod()
 			return true
+		case tcell.KeyCtrlD:
+			app.pager.ScrollHalfPageDown()
+			return true
+		case tcell.KeyCtrlU:
+			app.pager.ScrollHalfPageUp()
+			return true
+		case tcell.KeyCtrlB:
+			app.pager.ScrollPageUp()
+			return true
+		case tcell.KeyCtrlF:
+			app.pager.ScrollPageDown()
+			return true
 		case tcell.KeyRune:
 			switch ev.Rune() {
 			case 'q':
@@ -86,14 +98,14 @@ func (app *App) HandleEvent(ev tcell.Event) bool {
 				return true
 			case 'k':
 				if app.pagerEnabled {
-					// TODO scroll up pager
+					app.pager.ScrollUp()
 				} else {
 					app.SelectPrevPod()
 				}
 				return true
 			case 'j':
 				if app.pagerEnabled {
-					// TODO scroll down pager
+					app.pager.ScrollDown()
 				} else {
 					app.SelectNextPod()
 				}

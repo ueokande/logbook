@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"flag"
 	"log"
 	"os"
 	"path/filepath"
@@ -30,8 +29,6 @@ func main() {
 		namespace:  "default",
 		kubeconfig: filepath.Join(homedir, ".kube", "config"),
 	}
-
-	flag.Parse()
 
 	cmd := &cobra.Command{}
 	cmd.Short = "View logs on multiple pods and containers from Kubernetes"

@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"flag"
-	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -45,15 +44,18 @@ func main() {
 		defer cancel()
 
 		config := AppConfig{
-			Namespace:  params.namespace,
-			KubeConfig: params.kubeconfig,
+			Namespace: params.namespace,
 		}
 
-		app := NewApp(&config)
-		err := app.Run(ctx)
+		clientset, err := NewClientset(params.kubeconfig)
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			return err
+		}
+
+		app := NewApp(clientset, &config)
+		err = app.Run(ctx)
+		if err != nil {
+			return err
 		}
 
 		return nil

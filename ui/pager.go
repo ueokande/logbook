@@ -20,14 +20,22 @@ type Pager struct {
 func NewPager() *Pager {
 	w := &Pager{}
 	w.text.SetView(&w.viewport)
+	w.text.SetStyle(tcell.StyleDefault)
 	return w
 }
 
-func (w *Pager) SetContent(content string) {
+func (w *Pager) WriteText(content string) {
+	w.content += content
+	w.text.SetText(w.content)
 
-	w.content = content
-	w.text.SetText(content)
-	w.text.SetStyle(tcell.StyleDefault)
+	w.changed = true
+	w.layout()
+	w.PostEventWidgetContent(w)
+}
+
+func (w *Pager) ClearText() {
+	w.content = ""
+	w.text.SetText(w.content)
 
 	w.changed = true
 	w.layout()

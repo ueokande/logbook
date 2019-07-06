@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"context"
 
 	"github.com/gdamore/tcell"
@@ -8,19 +9,22 @@ import (
 	"github.com/ueokande/logbook/ui"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 )
 
 type AppConfig struct {
-	Namespace  string
-	KubeConfig string
+	Namespace string
 }
 
 type App struct {
-	podsView *ui.ListView
-	pager    *ui.Pager
+	clientset *kubernetes.Clientset
+
+	podsView     *ui.ListView
+	line         *ui.VerticalLine
+	pager        *ui.Pager
+	pagerEnabled bool
 
 	namespace   string
-	kubeconfig  string
 	pods        []corev1.Pod
 	selectedPod int
 
@@ -28,25 +32,25 @@ type App struct {
 	views.BoxLayout
 }
 
-func NewApp(config *AppConfig) *App {
+func NewApp(clientset *kubernetes.Clientset, config *AppConfig) *App {
 	podsView := ui.NewListView()
 	line := ui.NewVerticalLine(tcell.RuneVLine, tcell.StyleDefault)
 	pager := ui.NewPager()
 
 	app := &App{
-		namespace:  config.Namespace,
-		kubeconfig: config.KubeConfig,
+		clientset: clientset,
+
+		namespace: config.Namespace,
 
 		Application: new(views.Application),
 
 		podsView: podsView,
+		line:     line,
 		pager:    pager,
 	}
 
 	app.SetOrientation(views.Horizontal)
 	app.AddWidget(podsView, 0.1)
-	app.AddWidget(line, 0)
-	app.AddWidget(pager, 0.9)
 
 	app.SetRootWidget(app)
 
@@ -56,22 +60,41 @@ func NewApp(config *AppConfig) *App {
 func (app *App) HandleEvent(ev tcell.Event) bool {
 	switch ev := ev.(type) {
 	case *tcell.EventKey:
-		if ev.Key() == tcell.KeyEscape {
+		switch ev.Key() {
+		case tcell.KeyEnter:
+			app.ShowPager()
+			return true
+		case tcell.KeyCtrlC:
 			app.Quit()
 			return true
-		}
-
-		switch ev.Key() {
+		case tcell.KeyCtrlP:
+			app.SelectPrevPod()
+			return true
+		case tcell.KeyCtrlN:
+			app.SelectNextPod()
+			return true
 		case tcell.KeyRune:
 			switch ev.Rune() {
 			case 'q':
-				app.Quit()
+				if app.pagerEnabled {
+					app.HidePager()
+				} else {
+					app.Quit()
+				}
 				return true
 			case 'k':
-				app.SelectPrevPod()
+				if app.pagerEnabled {
+					// TODO scroll up pager
+				} else {
+					app.SelectPrevPod()
+				}
 				return true
 			case 'j':
-				app.SelectNextPod()
+				if app.pagerEnabled {
+					// TODO scroll down pager
+				} else {
+					app.SelectNextPod()
+				}
 				return true
 			}
 		}
@@ -86,8 +109,10 @@ func (app *App) SelectNextPod() {
 	}
 	app.podsView.SelectAt(app.selectedPod)
 
-	pod := app.pods[app.selectedPod]
-	app.pager.SetContent("Views logs on " + pod.Name)
+	if app.pagerEnabled {
+		pod := app.pods[app.selectedPod]
+		app.StartTailLog(pod)
+	}
 }
 
 func (app *App) SelectPrevPod() {
@@ -97,8 +122,10 @@ func (app *App) SelectPrevPod() {
 	}
 	app.podsView.SelectAt(app.selectedPod)
 
-	pod := app.pods[app.selectedPod]
-	app.pager.SetContent("Views logs on " + pod.Name)
+	if app.pagerEnabled {
+		pod := app.pods[app.selectedPod]
+		app.StartTailLog(pod)
+	}
 }
 
 func (app *App) AddPod(pod corev1.Pod) {
@@ -106,13 +133,53 @@ func (app *App) AddPod(pod corev1.Pod) {
 	app.podsView.AddItem(pod.Name, tcell.StyleDefault)
 }
 
-func (app *App) Run(ctx context.Context) error {
-	clientset, err := NewClientset(app.kubeconfig)
-	if err != nil {
-		return err
+func (app *App) ShowPager() {
+	if app.pagerEnabled {
+		return
 	}
+	app.AddWidget(app.line, 0)
+	app.AddWidget(app.pager, 0.9)
+	app.pagerEnabled = true
 
-	pods, err := clientset.CoreV1().Pods(app.namespace).List(metav1.ListOptions{})
+	pod := app.pods[app.selectedPod]
+	app.StartTailLog(pod)
+}
+
+func (app *App) HidePager() {
+	app.RemoveWidget(app.line)
+	app.RemoveWidget(app.pager)
+	app.pagerEnabled = false
+
+	app.StopTailLog()
+}
+
+func (app *App) StartTailLog(pod corev1.Pod) {
+	app.pager.ClearText()
+	go func() {
+		opts := &corev1.PodLogOptions{
+			Container: pod.Spec.Containers[0].Name,
+			Follow:    true,
+		}
+		req := app.clientset.CoreV1().Pods(pod.Namespace).GetLogs(pod.Name, opts)
+		r, err := req.Stream()
+		if err != nil {
+			return
+		}
+		defer r.Close()
+
+		s := bufio.NewScanner(r)
+		for s.Scan() {
+			app.pager.WriteText(s.Text() + "\n")
+			app.Refresh()
+		}
+	}()
+}
+
+func (app *App) StopTailLog() {
+}
+
+func (app *App) Run(ctx context.Context) error {
+	pods, err := app.clientset.CoreV1().Pods(app.namespace).List(metav1.ListOptions{})
 	if err != nil {
 		return err
 	}

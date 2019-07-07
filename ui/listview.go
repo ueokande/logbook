@@ -146,11 +146,15 @@ func (w *ListView) Size() (int, int) {
 }
 
 func (w *ListView) layout() {
+	vieww, _ := w.view.Size()
 	w.width, w.height = 0, 0
 	for y, item := range w.items {
 		textw, texth := item.text.Size()
 		if textw > w.width {
 			w.width = textw
+		}
+		if textw < vieww {
+			textw = vieww
 		}
 		item.view.Resize(0, y, textw, texth)
 		item.text.Resize()

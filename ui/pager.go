@@ -137,7 +137,7 @@ func (w *Pager) Size() (int, int) {
 }
 
 func (w *Pager) layout() {
-	w.width, w.height = w.text.Size()
+	w.width, w.height = w.view.Size()
 	w.viewport.Resize(0, 0, w.width, w.height)
 	w.text.Resize()
 

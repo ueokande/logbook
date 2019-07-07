@@ -31,9 +31,17 @@ func NewPager() *Pager {
 }
 
 func (w *Pager) WriteText(content string) {
+	prevLines := w.lines
+
 	w.lines += strings.Count(content, "\n")
 	w.content += content
+	_, vh := w.view.Size()
+	if prevLines-w.offset > vh {
+		// Out of viewport
+		return
+	}
 	w.text.SetText(tail(w.content, w.offset))
+	w.text.Watch(w)
 
 	w.changed = true
 	w.layout()

@@ -6,6 +6,7 @@ import (
 )
 
 type item struct {
+	name string
 	text *views.Text
 	view *views.ViewPort
 }
@@ -22,10 +23,16 @@ type ListView struct {
 }
 
 func NewListView() *ListView {
-	return &ListView{}
+	return &ListView{
+		selected: -1,
+	}
 }
 
 func (w *ListView) AddItem(text string, style tcell.Style) {
+	if w.getItemIndex(text) != -1 {
+		panic("item " + text + " already exists")
+	}
+
 	v := &views.ViewPort{}
 	v.SetView(w.view)
 
@@ -35,12 +42,43 @@ func (w *ListView) AddItem(text string, style tcell.Style) {
 	t.SetView(v)
 	t.Watch(w)
 
-	i := item{text: t, view: v}
-	w.items = append(w.items, i)
+	item := item{name: text, text: t, view: v}
+	w.items = append(w.items, item)
 
 	w.changed = true
 	w.layout()
 	w.PostEventWidgetContent(w)
+}
+
+func (w *ListView) SetStyle(text string, style tcell.Style) {
+	idx := w.getItemIndex(text)
+	if idx == -1 {
+		panic("item " + text + " not fount")
+	}
+
+	w.items[idx].text.SetStyle(style)
+	w.changed = true
+	w.layout()
+	w.PostEventWidgetContent(w)
+}
+
+func (w *ListView) DeleteItem(text string) {
+	idx := w.getItemIndex(text)
+	if idx == -1 {
+		panic("item " + text + " not fount")
+	}
+	item := w.items[idx]
+	item.text.Unwatch(w)
+	w.items = append(w.items[:idx], w.items[idx+1:]...)
+}
+
+func (w *ListView) getItemIndex(name string) int {
+	for i, item := range w.items {
+		if item.name == name {
+			return i
+		}
+	}
+	return -1
 }
 
 func (w *ListView) SelectAt(index int) {

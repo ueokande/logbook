@@ -9,7 +9,14 @@ import (
 	"github.com/ueokande/logbook/ui"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
+)
+
+var (
+	StylePodActive  = tcell.StyleDefault.Foreground(tcell.ColorGreen)
+	StylePodError   = tcell.StyleDefault.Foreground(tcell.ColorRed)
+	StylePodPending = tcell.StyleDefault.Foreground(tcell.ColorYellow)
 )
 
 type AppConfig struct {
@@ -25,8 +32,9 @@ type App struct {
 	pagerEnabled bool
 
 	namespace   string
-	pods        []corev1.Pod
+	pods        []*corev1.Pod
 	selectedPod int
+	podworker   *Worker
 	logworker   *Worker
 
 	*views.Application
@@ -47,6 +55,7 @@ func NewApp(clientset *kubernetes.Clientset, config *AppConfig) *App {
 
 		namespace: config.Namespace,
 		logworker: NewWorker(context.Background()),
+		podworker: NewWorker(context.Background()),
 
 		Application: new(views.Application),
 	}
@@ -142,7 +151,7 @@ func (app *App) SelectPrevPod() {
 	}
 }
 
-func (app *App) AddPod(pod corev1.Pod) {
+func (app *App) AddPod(pod *corev1.Pod) {
 	app.pods = append(app.pods, pod)
 	app.podsView.AddItem(pod.Name, tcell.StyleDefault)
 }
@@ -167,7 +176,7 @@ func (app *App) HidePager() {
 	app.StopTailLog()
 }
 
-func (app *App) StartTailLog(pod corev1.Pod) {
+func (app *App) StartTailLog(pod *corev1.Pod) {
 	app.StopTailLog()
 
 	app.pager.ClearText()
@@ -187,7 +196,7 @@ func (app *App) StartTailLog(pod corev1.Pod) {
 		s := bufio.NewScanner(r)
 		for s.Scan() {
 			app.pager.WriteText(s.Text() + "\n")
-			app.Refresh()
+			app.Update()
 		}
 		return s.Err()
 	})
@@ -201,16 +210,67 @@ func (app *App) StopTailLog() {
 
 }
 
+func (app *App) StartTailPods() {
+	app.StopTailLog()
+
+	app.podworker.Start(func(ctx context.Context) error {
+		result, err := app.clientset.CoreV1().Pods(app.namespace).Watch(metav1.ListOptions{})
+		if err != nil {
+			return err
+		}
+
+		for ev := range result.ResultChan() {
+			pod, ok := ev.Object.(*corev1.Pod)
+			if !ok {
+				continue
+			}
+
+			switch ev.Type {
+			case watch.Added:
+				app.pods = append(app.pods, pod)
+				switch GetPodStatus(pod) {
+				case PodRunning, PodSucceeded:
+					app.podsView.AddItem(pod.Name, StylePodActive)
+				case PodPending, PodInitializing, PodTerminating:
+					app.podsView.AddItem(pod.Name, StylePodPending)
+				default:
+					app.podsView.AddItem(pod.Name, StylePodError)
+				}
+				if len(app.pods) == 1 {
+					app.podsView.SelectAt(0)
+				}
+			case watch.Modified:
+				switch GetPodStatus(pod) {
+				case PodRunning, PodSucceeded:
+					app.podsView.SetStyle(pod.Name, StylePodActive)
+				case PodPending, PodInitializing, PodTerminating:
+					app.podsView.SetStyle(pod.Name, StylePodPending)
+				default:
+					app.podsView.SetStyle(pod.Name, StylePodError)
+				}
+			case watch.Deleted:
+				for i, p := range app.pods {
+					if p.Name == pod.Name {
+						app.pods = append(app.pods[:i], app.pods[i+1:]...)
+						break
+					}
+				}
+				app.podsView.DeleteItem(pod.Name)
+			}
+			app.Update()
+		}
+		return nil
+	})
+}
+
+func (app *App) StopTailPods() {
+	err := app.podworker.Stop()
+	if err != nil && err != context.Canceled {
+		panic(err)
+	}
+}
+
 func (app *App) Run(ctx context.Context) error {
-	pods, err := app.clientset.CoreV1().Pods(app.namespace).List(metav1.ListOptions{})
-	if err != nil {
-		return err
-	}
-
-	for _, p := range pods.Items {
-		app.AddPod(p)
-	}
-	app.podsView.SelectAt(0)
-
+	app.StartTailPods()
 	return app.Application.Run()
 }

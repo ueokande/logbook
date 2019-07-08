@@ -3,9 +3,11 @@ package main
 import (
 	"bufio"
 	"context"
+	"net/url"
 
 	"github.com/gdamore/tcell"
 	"github.com/gdamore/tcell/views"
+	"github.com/pkg/errors"
 	"github.com/ueokande/logbook/ui"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -246,10 +248,16 @@ func (app *App) StartTailLog(namespace, pod, container string) {
 
 func (app *App) StopTailLog() {
 	err := app.logworker.Stop()
-	if err != nil && err != context.Canceled {
+	err = errors.Cause(err)
+	if err == context.Canceled {
+		return
+	}
+	if uerr, ok := err.(*url.Error); ok && uerr.Err == context.Canceled {
+		return
+	}
+	if err != nil {
 		panic(err)
 	}
-
 }
 
 func (app *App) StartTailPods() {
@@ -306,7 +314,14 @@ func (app *App) StartTailPods() {
 
 func (app *App) StopTailPods() {
 	err := app.podworker.Stop()
-	if err != nil && err != context.Canceled {
+	err = errors.Cause(err)
+	if err == context.Canceled {
+		return
+	}
+	if uerr, ok := err.(*url.Error); ok && uerr.Err == context.Canceled {
+		return
+	}
+	if err != nil {
 		panic(err)
 	}
 }

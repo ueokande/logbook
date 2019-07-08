@@ -22,9 +22,7 @@ type Pager struct {
 }
 
 func NewPager() *Pager {
-	w := &Pager{
-		offset: 3,
-	}
+	w := &Pager{}
 	w.text.SetView(&w.viewport)
 	w.text.SetStyle(tcell.StyleDefault)
 	return w

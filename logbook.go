@@ -26,16 +26,20 @@ type AppConfig struct {
 type App struct {
 	clientset *kubernetes.Clientset
 
+	mainLayout   *views.BoxLayout
+	tabs         *ui.Tabs
 	podsView     *ui.ListView
 	line         *ui.VerticalLine
 	pager        *ui.Pager
 	pagerEnabled bool
 
-	namespace   string
-	pods        []*corev1.Pod
-	selectedPod int
-	podworker   *Worker
-	logworker   *Worker
+	namespace         string
+	pods              []*corev1.Pod
+	containers        []string
+	selectedPod       int
+	selectedContainer int
+	podworker         *Worker
+	logworker         *Worker
 
 	*views.Application
 	views.BoxLayout
@@ -45,13 +49,21 @@ func NewApp(clientset *kubernetes.Clientset, config *AppConfig) *App {
 	podsView := ui.NewListView()
 	line := ui.NewVerticalLine(tcell.RuneVLine, tcell.StyleDefault)
 	pager := ui.NewPager()
+	tabs := ui.NewTabs()
+
+	mainLayout := &views.BoxLayout{}
+	mainLayout.SetOrientation(views.Vertical)
+	mainLayout.AddWidget(tabs, 0)
+	mainLayout.AddWidget(pager, 1)
 
 	app := &App{
 		clientset: clientset,
 
-		podsView: podsView,
-		line:     line,
-		pager:    pager,
+		mainLayout: mainLayout,
+		tabs:       tabs,
+		podsView:   podsView,
+		line:       line,
+		pager:      pager,
 
 		namespace: config.Namespace,
 		logworker: NewWorker(context.Background()),
@@ -62,7 +74,6 @@ func NewApp(clientset *kubernetes.Clientset, config *AppConfig) *App {
 
 	app.SetOrientation(views.Horizontal)
 	app.AddWidget(podsView, 0.1)
-
 	app.SetRootWidget(app)
 
 	return app
@@ -96,6 +107,9 @@ func (app *App) HandleEvent(ev tcell.Event) bool {
 		case tcell.KeyCtrlF:
 			app.pager.ScrollPageDown()
 			return true
+		case tcell.KeyTab:
+			app.SelectNextContainer()
+			return true
 		case tcell.KeyRune:
 			switch ev.Rune() {
 			case 'q':
@@ -126,29 +140,58 @@ func (app *App) HandleEvent(ev tcell.Event) bool {
 }
 
 func (app *App) SelectNextPod() {
-	app.selectedPod += 1
-	if app.selectedPod >= len(app.pods) {
-		app.selectedPod = 0
-	}
-	app.podsView.SelectAt(app.selectedPod)
-
-	if app.pagerEnabled {
-		pod := app.pods[app.selectedPod]
-		app.StartTailLog(pod)
-	}
+	app.SelectPodAt(app.selectedPod + 1)
 }
 
 func (app *App) SelectPrevPod() {
-	app.selectedPod -= 1
-	if app.selectedPod < 0 {
-		app.selectedPod = len(app.pods) - 1
+	app.SelectPodAt(app.selectedPod - 1)
+}
+
+func (app *App) SelectPodAt(index int) {
+	if index < 0 {
+		index = 0
 	}
+	if index > len(app.pods)-1 {
+		index = len(app.pods) - 1
+	}
+	app.selectedPod = index
+
 	app.podsView.SelectAt(app.selectedPod)
 
 	if app.pagerEnabled {
 		pod := app.pods[app.selectedPod]
-		app.StartTailLog(pod)
+		app.containers = nil
+		app.tabs.Clear()
+		for _, c := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
+			app.tabs.AddTab(c.Name)
+			app.containers = append(app.containers, c.Name)
+		}
+		app.SelectContainerAt(0)
 	}
+}
+
+func (app *App) SelectNextContainer() {
+	index := app.selectedContainer + 1
+	if index > len(app.containers)-1 {
+		index = 0
+	}
+	app.SelectContainerAt(index)
+}
+
+func (app *App) SelectContainerAt(index int) {
+	if index < 0 {
+		index = 0
+	}
+	if index > len(app.pods)-1 {
+		index = len(app.pods) - 1
+	}
+	app.selectedContainer = index
+
+	app.tabs.SelectAt(index)
+
+	pod := app.pods[app.selectedPod]
+	container := app.containers[app.selectedContainer]
+	app.StartTailLog(pod.Namespace, pod.Name, container)
 }
 
 func (app *App) AddPod(pod *corev1.Pod) {
@@ -161,31 +204,30 @@ func (app *App) ShowPager() {
 		return
 	}
 	app.AddWidget(app.line, 0)
-	app.AddWidget(app.pager, 0.9)
+	app.AddWidget(app.mainLayout, 0.9)
 	app.pagerEnabled = true
 
-	pod := app.pods[app.selectedPod]
-	app.StartTailLog(pod)
+	app.SelectPodAt(app.selectedPod)
 }
 
 func (app *App) HidePager() {
 	app.RemoveWidget(app.line)
-	app.RemoveWidget(app.pager)
+	app.RemoveWidget(app.mainLayout)
 	app.pagerEnabled = false
 
 	app.StopTailLog()
 }
 
-func (app *App) StartTailLog(pod *corev1.Pod) {
+func (app *App) StartTailLog(namespace, pod, container string) {
 	app.StopTailLog()
 
 	app.pager.ClearText()
 	app.logworker.Start(func(ctx context.Context) error {
 		opts := &corev1.PodLogOptions{
-			Container: pod.Spec.Containers[0].Name,
+			Container: container,
 			Follow:    true,
 		}
-		req := app.clientset.CoreV1().Pods(pod.Namespace).GetLogs(pod.Name, opts)
+		req := app.clientset.CoreV1().Pods(namespace).GetLogs(pod, opts)
 		req.Context(ctx)
 		r, err := req.Stream()
 		if err != nil {
@@ -255,7 +297,6 @@ func (app *App) StartTailPods() {
 						break
 					}
 				}
-				app.podsView.DeleteItem(pod.Name)
 			}
 			app.Update()
 		}

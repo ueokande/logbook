@@ -8,12 +8,11 @@ import (
 )
 
 type PodStatus string
-type ContainerStatus string
 
 const (
-	PodRunning                = "Running"
+	PodRunning      PodStatus = "Running"
 	PodSucceeded              = "Succeeded"
-	PodPending      PodStatus = "Pending"
+	PodPending                = "Pending"
 	PodTerminating            = "Terminating"
 	PodInitializing           = "Initializing"
 	PodFailed                 = "Failed"

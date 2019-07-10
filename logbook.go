@@ -239,7 +239,7 @@ func (app *App) StartTailLog(namespace, pod, container string) {
 
 		s := bufio.NewScanner(r)
 		for s.Scan() {
-			app.pager.WriteText(s.Text() + "\n")
+			app.pager.AppendLine(s.Text())
 			app.Update()
 		}
 		return s.Err()

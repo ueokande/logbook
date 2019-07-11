@@ -238,9 +238,15 @@ func (app *App) StartTailLog(namespace, pod, container string) {
 		defer r.Close()
 
 		s := bufio.NewScanner(r)
+
+		// make channel to guarantee line order of logs
+		ch := make(chan string, 1)
 		for s.Scan() {
-			app.pager.AppendLine(s.Text())
-			app.Update()
+			app.PostFunc(func() {
+				line := <-ch
+				app.pager.AppendLine(line)
+			})
+			ch <- s.Text()
 		}
 		return s.Err()
 	})
@@ -262,7 +268,6 @@ func (app *App) StopTailLog() {
 
 func (app *App) StartTailPods() {
 	app.StopTailLog()
-
 	app.podworker.Start(func(ctx context.Context) error {
 		result, err := app.clientset.CoreV1().Pods(app.namespace).Watch(metav1.ListOptions{})
 		if err != nil {
@@ -270,43 +275,46 @@ func (app *App) StartTailPods() {
 		}
 
 		for ev := range result.ResultChan() {
+			ev := ev
 			pod, ok := ev.Object.(*corev1.Pod)
 			if !ok {
 				continue
 			}
 
-			switch ev.Type {
-			case watch.Added:
-				app.pods = append(app.pods, pod)
-				switch GetPodStatus(pod) {
-				case PodRunning, PodSucceeded:
-					app.podsView.AddItem(pod.Name, StylePodActive)
-				case PodPending, PodInitializing, PodTerminating:
-					app.podsView.AddItem(pod.Name, StylePodPending)
-				default:
-					app.podsView.AddItem(pod.Name, StylePodError)
-				}
-				if len(app.pods) == 1 {
-					app.podsView.SelectAt(0)
-				}
-			case watch.Modified:
-				switch GetPodStatus(pod) {
-				case PodRunning, PodSucceeded:
-					app.podsView.SetStyle(pod.Name, StylePodActive)
-				case PodPending, PodInitializing, PodTerminating:
-					app.podsView.SetStyle(pod.Name, StylePodPending)
-				default:
-					app.podsView.SetStyle(pod.Name, StylePodError)
-				}
-			case watch.Deleted:
-				for i, p := range app.pods {
-					if p.Name == pod.Name {
-						app.pods = append(app.pods[:i], app.pods[i+1:]...)
-						break
+			app.PostFunc(func() {
+				switch ev.Type {
+				case watch.Added:
+					app.pods = append(app.pods, pod)
+					switch GetPodStatus(pod) {
+					case PodRunning, PodSucceeded:
+						app.podsView.AddItem(pod.Name, StylePodActive)
+					case PodPending, PodInitializing, PodTerminating:
+						app.podsView.AddItem(pod.Name, StylePodPending)
+					default:
+						app.podsView.AddItem(pod.Name, StylePodError)
+					}
+					if len(app.pods) == 1 {
+						app.podsView.SelectAt(0)
+					}
+				case watch.Modified:
+					switch GetPodStatus(pod) {
+					case PodRunning, PodSucceeded:
+						app.podsView.SetStyle(pod.Name, StylePodActive)
+					case PodPending, PodInitializing, PodTerminating:
+						app.podsView.SetStyle(pod.Name, StylePodPending)
+					default:
+						app.podsView.SetStyle(pod.Name, StylePodError)
+					}
+				case watch.Deleted:
+					for i, p := range app.pods {
+						if p.Name == pod.Name {
+							app.pods = append(app.pods[:i], app.pods[i+1:]...)
+							break
+						}
 					}
 				}
-			}
-			app.Update()
+			})
+
 		}
 		return nil
 	})

@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"fmt"
 	"net/url"
 
 	"github.com/gdamore/tcell"
@@ -22,6 +23,7 @@ var (
 )
 
 type AppConfig struct {
+	Cluster   string
 	Namespace string
 }
 
@@ -29,6 +31,8 @@ type App struct {
 	clientset *kubernetes.Clientset
 
 	mainLayout   *views.BoxLayout
+	detailLayout *views.BoxLayout
+	statusbar    *ui.StatusBar
 	tabs         *ui.Tabs
 	podsView     *ui.ListView
 	line         *ui.VerticalLine
@@ -48,24 +52,32 @@ type App struct {
 }
 
 func NewApp(clientset *kubernetes.Clientset, config *AppConfig) *App {
+	statusbar := ui.NewStatusBar()
+	statusbar.SetCenterStatus(fmt.Sprintf("%s/%s", config.Cluster, config.Namespace))
 	podsView := ui.NewListView()
 	line := ui.NewVerticalLine(tcell.RuneVLine, tcell.StyleDefault)
 	pager := ui.NewPager()
 	tabs := ui.NewTabs()
 
+	detailLayout := &views.BoxLayout{}
+	detailLayout.SetOrientation(views.Vertical)
+	detailLayout.AddWidget(tabs, 0)
+	detailLayout.AddWidget(pager, 1)
+
 	mainLayout := &views.BoxLayout{}
-	mainLayout.SetOrientation(views.Vertical)
-	mainLayout.AddWidget(tabs, 0)
-	mainLayout.AddWidget(pager, 1)
+	mainLayout.SetOrientation(views.Horizontal)
+	mainLayout.AddWidget(podsView, 0)
 
 	app := &App{
 		clientset: clientset,
 
-		mainLayout: mainLayout,
-		tabs:       tabs,
-		podsView:   podsView,
-		line:       line,
-		pager:      pager,
+		mainLayout:   mainLayout,
+		detailLayout: detailLayout,
+		statusbar:    statusbar,
+		tabs:         tabs,
+		podsView:     podsView,
+		line:         line,
+		pager:        pager,
 
 		namespace: config.Namespace,
 		logworker: NewWorker(context.Background()),
@@ -74,8 +86,9 @@ func NewApp(clientset *kubernetes.Clientset, config *AppConfig) *App {
 		Application: new(views.Application),
 	}
 
-	app.SetOrientation(views.Horizontal)
-	app.AddWidget(podsView, 0.1)
+	app.SetOrientation(views.Vertical)
+	app.AddWidget(mainLayout, 1)
+	app.AddWidget(statusbar, 0)
 	app.SetRootWidget(app)
 
 	return app
@@ -196,25 +209,20 @@ func (app *App) SelectContainerAt(index int) {
 	app.StartTailLog(pod.Namespace, pod.Name, container)
 }
 
-func (app *App) AddPod(pod *corev1.Pod) {
-	app.pods = append(app.pods, pod)
-	app.podsView.AddItem(pod.Name, tcell.StyleDefault)
-}
-
 func (app *App) ShowPager() {
 	if app.pagerEnabled {
 		return
 	}
-	app.AddWidget(app.line, 0)
-	app.AddWidget(app.mainLayout, 0.9)
+	app.mainLayout.AddWidget(app.line, 0)
+	app.mainLayout.AddWidget(app.detailLayout, 1)
 	app.pagerEnabled = true
 
 	app.SelectPodAt(app.selectedPod)
 }
 
 func (app *App) HidePager() {
-	app.RemoveWidget(app.line)
-	app.RemoveWidget(app.mainLayout)
+	app.mainLayout.RemoveWidget(app.line)
+	app.mainLayout.RemoveWidget(app.detailLayout)
 	app.pagerEnabled = false
 
 	app.StopTailLog()
@@ -320,6 +328,7 @@ func (app *App) StartTailPods() {
 						}
 					}
 				}
+				app.statusbar.SetLeftStatus(fmt.Sprintf("%d Pods", len(app.pods)))
 			})
 
 		}

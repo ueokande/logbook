@@ -1,9 +1,7 @@
 package main
 
 import (
-	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
@@ -19,24 +17,14 @@ const (
 	PodUnknown                = "Unknown"
 )
 
-func NewClientset(kubeconfig string) (*kubernetes.Clientset, error) {
-	configLoadingRules := &clientcmd.ClientConfigLoadingRules{}
-	configLoadingRules.ExplicitPath = kubeconfig
-	config := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
-		configLoadingRules,
-		&clientcmd.ConfigOverrides{},
-	)
-	cconfig, err := config.ClientConfig()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get client config")
+func GetKubeConfig(kubeconfig string) clientcmd.ClientConfig {
+	rules := clientcmd.NewDefaultClientConfigLoadingRules()
+	if len(kubeconfig) > 0 {
+		rules.Precedence = []string{kubeconfig}
 	}
+	overrides := &clientcmd.ConfigOverrides{}
 
-	clientset, err := kubernetes.NewForConfig(cconfig)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create clientset")
-	}
-
-	return clientset, nil
+	return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(rules, overrides)
 }
 
 func GetPodStatus(pod *corev1.Pod) PodStatus {

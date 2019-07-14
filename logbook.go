@@ -296,7 +296,7 @@ func (app *App) StopTailLog() {
 		return
 	}
 	if err != nil {
-		panic(err)
+		// TODO handle err
 	}
 }
 
@@ -346,6 +346,7 @@ func (app *App) StartTailPods() {
 							break
 						}
 					}
+					app.podsView.DeleteItem(pod.Name)
 				}
 				app.statusbar.SetLeftStatus(fmt.Sprintf("%d Pods", len(app.pods)))
 			})
@@ -365,7 +366,7 @@ func (app *App) StopTailPods() {
 		return
 	}
 	if err != nil {
-		panic(err)
+		// TODO handle err
 	}
 }
 

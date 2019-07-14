@@ -112,15 +112,19 @@ func (app *App) HandleEvent(ev tcell.Event) bool {
 			return true
 		case tcell.KeyCtrlD:
 			app.pager.ScrollHalfPageDown()
+			app.UpdateScrollStatus()
 			return true
 		case tcell.KeyCtrlU:
 			app.pager.ScrollHalfPageUp()
+			app.UpdateScrollStatus()
 			return true
 		case tcell.KeyCtrlB:
 			app.pager.ScrollPageUp()
+			app.UpdateScrollStatus()
 			return true
 		case tcell.KeyCtrlF:
 			app.pager.ScrollPageDown()
+			app.UpdateScrollStatus()
 			return true
 		case tcell.KeyTab:
 			app.SelectNextContainer()
@@ -137,6 +141,7 @@ func (app *App) HandleEvent(ev tcell.Event) bool {
 			case 'k':
 				if app.pagerEnabled {
 					app.pager.ScrollUp()
+					app.UpdateScrollStatus()
 				} else {
 					app.SelectPrevPod()
 				}
@@ -144,9 +149,16 @@ func (app *App) HandleEvent(ev tcell.Event) bool {
 			case 'j':
 				if app.pagerEnabled {
 					app.pager.ScrollDown()
+					app.UpdateScrollStatus()
 				} else {
 					app.SelectNextPod()
 				}
+				return true
+			case 'g':
+				app.pager.ScrollToTop()
+				return true
+			case 'G':
+				app.pager.ScrollToBottom()
 				return true
 			}
 		}
@@ -185,6 +197,11 @@ func (app *App) SelectPodAt(index int) {
 	}
 }
 
+func (app *App) UpdateScrollStatus() {
+	y := app.pager.GetScrollYPosition()
+	app.statusbar.SetRightStatus(fmt.Sprintf("%3d%%", int(y*100)))
+}
+
 func (app *App) SelectNextContainer() {
 	index := app.selectedContainer + 1
 	if index > len(app.containers)-1 {
@@ -203,6 +220,7 @@ func (app *App) SelectContainerAt(index int) {
 	app.selectedContainer = index
 
 	app.tabs.SelectAt(index)
+	app.UpdateScrollStatus()
 
 	pod := app.pods[app.selectedPod]
 	container := app.containers[app.selectedContainer]
@@ -254,6 +272,7 @@ func (app *App) StartTailLog(namespace, pod, container string) {
 			app.PostFunc(func() {
 				for line := range ch {
 					app.pager.AppendLine(line)
+					app.UpdateScrollStatus()
 					break
 				}
 			})

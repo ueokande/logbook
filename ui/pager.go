@@ -48,7 +48,7 @@ func (w *Pager) ScrollHalfPageDown() {
 
 func (w *Pager) ScrollHalfPageUp() {
 	_, vh := w.view.Size()
-	w.viewport.ScrollUp(vh / -2)
+	w.viewport.ScrollUp(vh / 2)
 }
 
 func (w *Pager) ScrollPageDown() {
@@ -59,6 +59,23 @@ func (w *Pager) ScrollPageDown() {
 func (w *Pager) ScrollPageUp() {
 	_, vh := w.view.Size()
 	w.viewport.ScrollUp(vh)
+}
+
+func (w *Pager) ScrollToTop() {
+	_, h := w.text.Size()
+	w.viewport.ScrollUp(h)
+}
+
+func (w *Pager) ScrollToBottom() {
+	_, h := w.text.Size()
+	w.viewport.ScrollDown(h)
+}
+
+func (w *Pager) GetScrollYPosition() float64 {
+	_, contenth := w.viewport.GetContentSize()
+	_, viewh := w.viewport.Size()
+	_, y, _, _ := w.viewport.GetVisible()
+	return float64(y) / float64(contenth-viewh)
 }
 
 func (w *Pager) ClearText() {

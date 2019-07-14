@@ -240,13 +240,20 @@ func (app *App) StartTailLog(namespace, pod, container string) {
 		s := bufio.NewScanner(r)
 
 		// make channel to guarantee line order of logs
-		ch := make(chan string, 1)
+		ch := make(chan string)
+		defer close(ch)
 		for s.Scan() {
 			app.PostFunc(func() {
-				line := <-ch
-				app.pager.AppendLine(line)
+				for line := range ch {
+					app.pager.AppendLine(line)
+					break
+				}
 			})
-			ch <- s.Text()
+			select {
+			case ch <- s.Text():
+			case <-ctx.Done():
+				return nil
+			}
 		}
 		return s.Err()
 	})

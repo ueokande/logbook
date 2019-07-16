@@ -156,9 +156,11 @@ func (app *App) HandleEvent(ev tcell.Event) bool {
 				return true
 			case 'g':
 				app.pager.ScrollToTop()
+				app.UpdateScrollStatus()
 				return true
 			case 'G':
 				app.pager.ScrollToBottom()
+				app.UpdateScrollStatus()
 				return true
 			}
 		}

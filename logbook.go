@@ -46,6 +46,7 @@ type App struct {
 	selectedContainer int
 	podworker         *Worker
 	logworker         *Worker
+	follow            bool
 
 	*views.Application
 	views.BoxLayout
@@ -111,18 +112,30 @@ func (app *App) HandleEvent(ev tcell.Event) bool {
 			app.SelectNextPod()
 			return true
 		case tcell.KeyCtrlD:
+			if app.follow {
+				return false
+			}
 			app.pager.ScrollHalfPageDown()
 			app.UpdateScrollStatus()
 			return true
 		case tcell.KeyCtrlU:
+			if app.follow {
+				return false
+			}
 			app.pager.ScrollHalfPageUp()
 			app.UpdateScrollStatus()
 			return true
 		case tcell.KeyCtrlB:
+			if app.follow {
+				return false
+			}
 			app.pager.ScrollPageUp()
 			app.UpdateScrollStatus()
 			return true
 		case tcell.KeyCtrlF:
+			if app.follow {
+				return false
+			}
 			app.pager.ScrollPageDown()
 			app.UpdateScrollStatus()
 			return true
@@ -139,6 +152,9 @@ func (app *App) HandleEvent(ev tcell.Event) bool {
 				}
 				return true
 			case 'k':
+				if app.follow {
+					return false
+				}
 				if app.pagerEnabled {
 					app.pager.ScrollUp()
 					app.UpdateScrollStatus()
@@ -147,6 +163,9 @@ func (app *App) HandleEvent(ev tcell.Event) bool {
 				}
 				return true
 			case 'j':
+				if app.follow {
+					return false
+				}
 				if app.pagerEnabled {
 					app.pager.ScrollDown()
 					app.UpdateScrollStatus()
@@ -155,13 +174,29 @@ func (app *App) HandleEvent(ev tcell.Event) bool {
 				}
 				return true
 			case 'g':
+				if app.follow {
+					return false
+				}
 				app.pager.ScrollToTop()
 				app.UpdateScrollStatus()
 				return true
 			case 'G':
+				if app.follow {
+					return false
+				}
 				app.pager.ScrollToBottom()
 				app.UpdateScrollStatus()
 				return true
+			case 'f':
+				if app.pagerEnabled {
+					app.follow = !app.follow
+					if app.follow {
+						app.pager.ScrollToBottom()
+						app.UpdateScrollStatus()
+						return true
+					}
+				}
+				return false
 			}
 		}
 	}
@@ -220,6 +255,7 @@ func (app *App) SelectContainerAt(index int) {
 		index = len(app.pods) - 1
 	}
 	app.selectedContainer = index
+	app.follow = false
 
 	app.tabs.SelectAt(index)
 	app.UpdateScrollStatus()
@@ -274,6 +310,9 @@ func (app *App) StartTailLog(namespace, pod, container string) {
 			app.PostFunc(func() {
 				for line := range ch {
 					app.pager.AppendLine(line)
+					if app.follow {
+						app.pager.ScrollToBottom()
+					}
 					app.UpdateScrollStatus()
 					break
 				}

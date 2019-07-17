@@ -86,6 +86,7 @@ func NewApp(clientset *kubernetes.Clientset, config *AppConfig) *App {
 		Application: new(views.Application),
 	}
 
+	app.statusbar.SetMode(ui.ModeNormal)
 	app.SetOrientation(views.Vertical)
 	app.AddWidget(mainLayout, 1)
 	app.AddWidget(statusbar, 0)
@@ -190,10 +191,13 @@ func (app *App) HandleEvent(ev tcell.Event) bool {
 				if app.pagerEnabled {
 					app.follow = !app.follow
 					if app.follow {
+						app.statusbar.SetMode(ui.ModeFollow)
 						app.pager.ScrollToBottom()
 						app.UpdateScrollStatus()
-						return true
+					} else {
+						app.statusbar.SetMode(ui.ModeNormal)
 					}
+					return true
 				}
 				return false
 			}
@@ -255,6 +259,7 @@ func (app *App) SelectContainerAt(index int) {
 	}
 	app.selectedContainer = index
 	app.follow = false
+	app.statusbar.SetMode(ui.ModeNormal)
 
 	app.tabs.SelectAt(index)
 	app.UpdateScrollStatus()
@@ -279,6 +284,8 @@ func (app *App) HidePager() {
 	app.mainLayout.RemoveWidget(app.line)
 	app.mainLayout.RemoveWidget(app.detailLayout)
 	app.pagerEnabled = false
+	app.follow = false
+	app.statusbar.SetMode(ui.ModeNormal)
 
 	app.StopTailLog()
 }

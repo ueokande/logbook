@@ -1,8 +1,7 @@
-package main
+package k8s
 
 import (
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/tools/clientcmd"
 )
 
 type PodStatus string
@@ -16,16 +15,6 @@ const (
 	PodFailed                 = "Failed"
 	PodUnknown                = "Unknown"
 )
-
-func GetKubeConfig(kubeconfig string) clientcmd.ClientConfig {
-	rules := clientcmd.NewDefaultClientConfigLoadingRules()
-	if len(kubeconfig) > 0 {
-		rules.Precedence = []string{kubeconfig}
-	}
-	overrides := &clientcmd.ConfigOverrides{}
-
-	return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(rules, overrides)
-}
 
 func GetPodStatus(pod *corev1.Pod) PodStatus {
 	switch pod.Status.Phase {

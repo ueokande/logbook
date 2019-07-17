@@ -1,18 +1,13 @@
 package main
 
 import (
-	"bufio"
 	"context"
-	"net/url"
 
 	"github.com/gdamore/tcell"
 	"github.com/gdamore/tcell/views"
-	"github.com/pkg/errors"
-	"github.com/ueokande/logbook/ui"
+	"github.com/ueokande/logbook/pkg/k8s"
+	"github.com/ueokande/logbook/pkg/ui"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/kubernetes"
 )
 
 var (
@@ -27,7 +22,7 @@ type AppConfig struct {
 }
 
 type App struct {
-	clientset *kubernetes.Clientset
+	client *k8s.Client
 
 	mainLayout   *views.BoxLayout
 	detailLayout *views.BoxLayout
@@ -51,7 +46,7 @@ type App struct {
 	views.BoxLayout
 }
 
-func NewApp(clientset *kubernetes.Clientset, config *AppConfig) *App {
+func NewApp(client *k8s.Client, config *AppConfig) *App {
 	statusbar := ui.NewStatusBar()
 	statusbar.SetContext(config.Cluster, config.Namespace)
 	podsView := ui.NewListView()
@@ -69,7 +64,7 @@ func NewApp(clientset *kubernetes.Clientset, config *AppConfig) *App {
 	mainLayout.AddWidget(podsView, 0)
 
 	app := &App{
-		clientset: clientset,
+		client: client,
 
 		mainLayout:   mainLayout,
 		detailLayout: detailLayout,
@@ -295,24 +290,15 @@ func (app *App) StartTailLog(namespace, pod, container string) {
 
 	app.pager.ClearText()
 	app.logworker.Start(func(ctx context.Context) error {
-		opts := &corev1.PodLogOptions{
-			Container: container,
-			Follow:    true,
-		}
-		req := app.clientset.CoreV1().Pods(namespace).GetLogs(pod, opts)
-		req.Context(ctx)
-		r, err := req.Stream()
+		logs, err := app.client.WatchLogs(ctx, namespace, pod, container)
 		if err != nil {
 			return err
 		}
-		defer r.Close()
-
-		s := bufio.NewScanner(r)
 
 		// make channel to guarantee line order of logs
 		ch := make(chan string)
 		defer close(ch)
-		for s.Scan() {
+		for log := range logs {
 			app.PostFunc(func() {
 				for line := range ch {
 					app.pager.AppendLine(line)
@@ -324,52 +310,38 @@ func (app *App) StartTailLog(namespace, pod, container string) {
 				}
 			})
 			select {
-			case ch <- s.Text():
+			case ch <- log:
 			case <-ctx.Done():
 				return nil
 			}
 		}
-		return s.Err()
+		return nil
 	})
 }
 
 func (app *App) StopTailLog() {
-	err := app.logworker.Stop()
-	err = errors.Cause(err)
-	if err == context.Canceled {
-		return
-	}
-	if uerr, ok := err.(*url.Error); ok && uerr.Err == context.Canceled {
-		return
-	}
-	if err != nil {
-		// TODO handle err
-	}
+	app.logworker.Stop()
+	// TODO handle err
 }
 
 func (app *App) StartTailPods() {
 	app.StopTailLog()
 	app.podworker.Start(func(ctx context.Context) error {
-		result, err := app.clientset.CoreV1().Pods(app.namespace).Watch(metav1.ListOptions{})
+		events, err := app.client.WatchPods(ctx, app.namespace)
 		if err != nil {
 			return err
 		}
-
-		for ev := range result.ResultChan() {
+		for ev := range events {
 			ev := ev
-			pod, ok := ev.Object.(*corev1.Pod)
-			if !ok {
-				continue
-			}
-
 			app.PostFunc(func() {
+				pod := ev.Pod
 				switch ev.Type {
-				case watch.Added:
+				case k8s.PodAdded:
 					app.pods = append(app.pods, pod)
-					switch GetPodStatus(pod) {
-					case PodRunning, PodSucceeded:
+					switch k8s.GetPodStatus(pod) {
+					case k8s.PodRunning, k8s.PodSucceeded:
 						app.podsView.AddItem(pod.Name, StylePodActive)
-					case PodPending, PodInitializing, PodTerminating:
+					case k8s.PodPending, k8s.PodInitializing, k8s.PodTerminating:
 						app.podsView.AddItem(pod.Name, StylePodPending)
 					default:
 						app.podsView.AddItem(pod.Name, StylePodError)
@@ -377,16 +349,16 @@ func (app *App) StartTailPods() {
 					if len(app.pods) == 1 {
 						app.podsView.SelectAt(0)
 					}
-				case watch.Modified:
-					switch GetPodStatus(pod) {
-					case PodRunning, PodSucceeded:
+				case k8s.PodModified:
+					switch k8s.GetPodStatus(pod) {
+					case k8s.PodRunning, k8s.PodSucceeded:
 						app.podsView.SetStyle(pod.Name, StylePodActive)
-					case PodPending, PodInitializing, PodTerminating:
+					case k8s.PodPending, k8s.PodInitializing, k8s.PodTerminating:
 						app.podsView.SetStyle(pod.Name, StylePodPending)
 					default:
 						app.podsView.SetStyle(pod.Name, StylePodError)
 					}
-				case watch.Deleted:
+				case k8s.PodDeleted:
 					for i, p := range app.pods {
 						if p.Name == pod.Name {
 							app.pods = append(app.pods[:i], app.pods[i+1:]...)
@@ -404,17 +376,8 @@ func (app *App) StartTailPods() {
 }
 
 func (app *App) StopTailPods() {
-	err := app.podworker.Stop()
-	err = errors.Cause(err)
-	if err == context.Canceled {
-		return
-	}
-	if uerr, ok := err.(*url.Error); ok && uerr.Err == context.Canceled {
-		return
-	}
-	if err != nil {
-		// TODO handle err
-	}
+	app.podworker.Stop()
+	// TODO handle err
 }
 
 func (app *App) Run(ctx context.Context) error {

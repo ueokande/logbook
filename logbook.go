@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"context"
-	"fmt"
 	"net/url"
 
 	"github.com/gdamore/tcell"
@@ -54,7 +53,7 @@ type App struct {
 
 func NewApp(clientset *kubernetes.Clientset, config *AppConfig) *App {
 	statusbar := ui.NewStatusBar()
-	statusbar.SetCenterStatus(fmt.Sprintf("%s/%s", config.Cluster, config.Namespace))
+	statusbar.SetContext(config.Cluster, config.Namespace)
 	podsView := ui.NewListView()
 	line := ui.NewVerticalLine(tcell.RuneVLine, tcell.StyleDefault)
 	pager := ui.NewPager()
@@ -236,7 +235,7 @@ func (app *App) SelectPodAt(index int) {
 
 func (app *App) UpdateScrollStatus() {
 	y := app.pager.GetScrollYPosition()
-	app.statusbar.SetRightStatus(fmt.Sprintf("%3d%%", int(y*100)))
+	app.statusbar.SetScroll(int(y * 100))
 }
 
 func (app *App) SelectNextContainer() {
@@ -389,7 +388,7 @@ func (app *App) StartTailPods() {
 					}
 					app.podsView.DeleteItem(pod.Name)
 				}
-				app.statusbar.SetLeftStatus(fmt.Sprintf("%d Pods", len(app.pods)))
+				app.statusbar.SetPodCount(len(app.pods))
 			})
 
 		}

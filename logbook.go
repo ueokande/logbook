@@ -7,6 +7,7 @@ import (
 	"github.com/gdamore/tcell/views"
 	"github.com/ueokande/logbook/pkg/k8s"
 	"github.com/ueokande/logbook/pkg/ui"
+	"github.com/ueokande/logbook/pkg/widgets"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -27,7 +28,7 @@ type App struct {
 	mainLayout   *views.BoxLayout
 	detailLayout *views.BoxLayout
 	statusbar    *ui.StatusBar
-	tabs         *ui.Tabs
+	tabs         *widgets.Tabs
 	podsView     *ui.ListView
 	line         *ui.VerticalLine
 	pager        *ui.Pager
@@ -52,7 +53,7 @@ func NewApp(client *k8s.Client, config *AppConfig) *App {
 	podsView := ui.NewListView()
 	line := ui.NewVerticalLine(tcell.RuneVLine, tcell.StyleDefault)
 	pager := ui.NewPager()
-	tabs := ui.NewTabs()
+	tabs := widgets.NewTabs()
 
 	detailLayout := &views.BoxLayout{}
 	detailLayout.SetOrientation(views.Vertical)
@@ -81,6 +82,8 @@ func NewApp(client *k8s.Client, config *AppConfig) *App {
 		Application: new(views.Application),
 	}
 
+	tabs.Watch(app)
+
 	app.statusbar.SetMode(ui.ModeNormal)
 	app.SetOrientation(views.Vertical)
 	app.AddWidget(mainLayout, 1)
@@ -92,6 +95,12 @@ func NewApp(client *k8s.Client, config *AppConfig) *App {
 
 func (app *App) HandleEvent(ev tcell.Event) bool {
 	switch ev := ev.(type) {
+	case *widgets.EventItemSelected:
+		switch ev.Widget() {
+		case app.tabs:
+			app.HandleContainerSelected(ev.Name, ev.Index)
+			return true
+		}
 	case *tcell.EventKey:
 		switch ev.Key() {
 		case tcell.KeyEnter:
@@ -201,6 +210,18 @@ func (app *App) HandleEvent(ev tcell.Event) bool {
 	return app.BoxLayout.HandleEvent(ev)
 }
 
+func (app *App) HandleContainerSelected(name string, index int) {
+	app.selectedContainer = index
+	app.follow = false
+	app.statusbar.SetMode(ui.ModeNormal)
+
+	app.UpdateScrollStatus()
+
+	pod := app.pods[app.selectedPod]
+	container := app.containers[app.selectedContainer]
+	app.StartTailLog(pod.Namespace, pod.Name, container)
+}
+
 func (app *App) SelectNextPod() {
 	app.SelectPodAt(app.selectedPod + 1)
 }
@@ -252,16 +273,7 @@ func (app *App) SelectContainerAt(index int) {
 	if index > len(app.pods)-1 {
 		index = len(app.pods) - 1
 	}
-	app.selectedContainer = index
-	app.follow = false
-	app.statusbar.SetMode(ui.ModeNormal)
-
 	app.tabs.SelectAt(index)
-	app.UpdateScrollStatus()
-
-	pod := app.pods[app.selectedPod]
-	container := app.containers[app.selectedContainer]
-	app.StartTailLog(pod.Namespace, pod.Name, container)
 }
 
 func (app *App) ShowPager() {

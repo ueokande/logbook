@@ -1,4 +1,4 @@
-package ui
+package widgets
 
 import (
 	"github.com/gdamore/tcell"
@@ -61,4 +61,13 @@ func (w *Tabs) SelectAt(index int) {
 	text.SetStyle(styleTabActive)
 
 	w.PostEventWidgetContent(w)
+
+	ev := &EventItemSelected{
+		Name:   text.Text(),
+		Index:  index,
+		widget: w,
+	}
+	ev.SetEventNow()
+
+	w.PostEvent(ev)
 }

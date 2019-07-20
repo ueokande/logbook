@@ -1,4 +1,4 @@
-package ui
+package widgets
 
 import (
 	"github.com/gdamore/tcell"
@@ -98,6 +98,15 @@ func (w *ListView) SelectAt(index int) {
 	i.text.SetStyle(i.text.Style().Reverse(true))
 
 	w.PostEventWidgetContent(w)
+
+	ev := &EventItemSelected{
+		Name:   i.name,
+		Index:  index,
+		widget: w,
+	}
+	ev.SetEventNow()
+
+	w.PostEvent(ev)
 }
 
 func (w *ListView) Draw() {

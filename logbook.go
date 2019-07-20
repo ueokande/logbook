@@ -29,10 +29,9 @@ type App struct {
 	detailLayout *views.BoxLayout
 	statusbar    *ui.StatusBar
 	tabs         *widgets.Tabs
-	podsView     *ui.ListView
+	podsView     *widgets.ListView
 	line         *ui.VerticalLine
 	pager        *ui.Pager
-	pagerEnabled bool
 
 	namespace         string
 	pods              []*corev1.Pod
@@ -50,7 +49,7 @@ type App struct {
 func NewApp(client *k8s.Client, config *AppConfig) *App {
 	statusbar := ui.NewStatusBar()
 	statusbar.SetContext(config.Cluster, config.Namespace)
-	podsView := ui.NewListView()
+	podsView := widgets.NewListView()
 	line := ui.NewVerticalLine(tcell.RuneVLine, tcell.StyleDefault)
 	pager := ui.NewPager()
 	tabs := widgets.NewTabs()
@@ -63,6 +62,8 @@ func NewApp(client *k8s.Client, config *AppConfig) *App {
 	mainLayout := &views.BoxLayout{}
 	mainLayout.SetOrientation(views.Horizontal)
 	mainLayout.AddWidget(podsView, 0)
+	mainLayout.AddWidget(line, 0)
+	mainLayout.AddWidget(detailLayout, 1)
 
 	app := &App{
 		client: client,
@@ -83,6 +84,7 @@ func NewApp(client *k8s.Client, config *AppConfig) *App {
 	}
 
 	tabs.Watch(app)
+	podsView.Watch(app)
 
 	app.statusbar.SetMode(ui.ModeNormal)
 	app.SetOrientation(views.Vertical)
@@ -100,12 +102,12 @@ func (app *App) HandleEvent(ev tcell.Event) bool {
 		case app.tabs:
 			app.HandleContainerSelected(ev.Name, ev.Index)
 			return true
+		case app.podsView:
+			app.HandlePodSelected(ev.Name, ev.Index)
+			return true
 		}
 	case *tcell.EventKey:
 		switch ev.Key() {
-		case tcell.KeyEnter:
-			app.ShowPager()
-			return true
 		case tcell.KeyCtrlC:
 			app.Quit()
 			return true
@@ -149,33 +151,21 @@ func (app *App) HandleEvent(ev tcell.Event) bool {
 		case tcell.KeyRune:
 			switch ev.Rune() {
 			case 'q':
-				if app.pagerEnabled {
-					app.HidePager()
-				} else {
-					app.Quit()
-				}
+				app.Quit()
 				return true
 			case 'k':
 				if app.follow {
 					return false
 				}
-				if app.pagerEnabled {
-					app.pager.ScrollUp()
-					app.UpdateScrollStatus()
-				} else {
-					app.SelectPrevPod()
-				}
+				app.pager.ScrollUp()
+				app.UpdateScrollStatus()
 				return true
 			case 'j':
 				if app.follow {
 					return false
 				}
-				if app.pagerEnabled {
-					app.pager.ScrollDown()
-					app.UpdateScrollStatus()
-				} else {
-					app.SelectNextPod()
-				}
+				app.pager.ScrollDown()
+				app.UpdateScrollStatus()
 				return true
 			case 'g':
 				if app.follow {
@@ -192,18 +182,15 @@ func (app *App) HandleEvent(ev tcell.Event) bool {
 				app.UpdateScrollStatus()
 				return true
 			case 'f':
-				if app.pagerEnabled {
-					app.follow = !app.follow
-					if app.follow {
-						app.statusbar.SetMode(ui.ModeFollow)
-						app.pager.ScrollToBottom()
-						app.UpdateScrollStatus()
-					} else {
-						app.statusbar.SetMode(ui.ModeNormal)
-					}
-					return true
+				app.follow = !app.follow
+				if app.follow {
+					app.statusbar.SetMode(ui.ModeFollow)
+					app.pager.ScrollToBottom()
+					app.UpdateScrollStatus()
+				} else {
+					app.statusbar.SetMode(ui.ModeNormal)
 				}
-				return false
+				return true
 			}
 		}
 	}
@@ -220,6 +207,17 @@ func (app *App) HandleContainerSelected(name string, index int) {
 	pod := app.pods[app.selectedPod]
 	container := app.containers[app.selectedContainer]
 	app.StartTailLog(pod.Namespace, pod.Name, container)
+}
+
+func (app *App) HandlePodSelected(name string, index int) {
+	pod := app.pods[app.selectedPod]
+	app.containers = nil
+	app.tabs.Clear()
+	for _, c := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
+		app.tabs.AddTab(c.Name)
+		app.containers = append(app.containers, c.Name)
+	}
+	app.SelectContainerAt(0)
 }
 
 func (app *App) SelectNextPod() {
@@ -240,17 +238,6 @@ func (app *App) SelectPodAt(index int) {
 	app.selectedPod = index
 
 	app.podsView.SelectAt(app.selectedPod)
-
-	if app.pagerEnabled {
-		pod := app.pods[app.selectedPod]
-		app.containers = nil
-		app.tabs.Clear()
-		for _, c := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
-			app.tabs.AddTab(c.Name)
-			app.containers = append(app.containers, c.Name)
-		}
-		app.SelectContainerAt(0)
-	}
 }
 
 func (app *App) UpdateScrollStatus() {
@@ -274,27 +261,6 @@ func (app *App) SelectContainerAt(index int) {
 		index = len(app.pods) - 1
 	}
 	app.tabs.SelectAt(index)
-}
-
-func (app *App) ShowPager() {
-	if app.pagerEnabled {
-		return
-	}
-	app.mainLayout.AddWidget(app.line, 0)
-	app.mainLayout.AddWidget(app.detailLayout, 1)
-	app.pagerEnabled = true
-
-	app.SelectPodAt(app.selectedPod)
-}
-
-func (app *App) HidePager() {
-	app.mainLayout.RemoveWidget(app.line)
-	app.mainLayout.RemoveWidget(app.detailLayout)
-	app.pagerEnabled = false
-	app.follow = false
-	app.statusbar.SetMode(ui.ModeNormal)
-
-	app.StopTailLog()
 }
 
 func (app *App) StartTailLog(namespace, pod, container string) {

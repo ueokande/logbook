@@ -30,8 +30,8 @@ type App struct {
 	statusbar    *ui.StatusBar
 	tabs         *widgets.Tabs
 	podsView     *widgets.ListView
-	line         *ui.VerticalLine
-	pager        *ui.Pager
+	line         *widgets.VerticalLine
+	pager        *widgets.Pager
 
 	namespace         string
 	pods              []*corev1.Pod
@@ -50,8 +50,8 @@ func NewApp(client *k8s.Client, config *AppConfig) *App {
 	statusbar := ui.NewStatusBar()
 	statusbar.SetContext(config.Cluster, config.Namespace)
 	podsView := widgets.NewListView()
-	line := ui.NewVerticalLine(tcell.RuneVLine, tcell.StyleDefault)
-	pager := ui.NewPager()
+	line := widgets.NewVerticalLine(tcell.RuneVLine, tcell.StyleDefault)
+	pager := widgets.NewPager()
 	tabs := widgets.NewTabs()
 
 	detailLayout := &views.BoxLayout{}

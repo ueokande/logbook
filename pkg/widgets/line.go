@@ -1,4 +1,4 @@
-package ui
+package widgets
 
 import (
 	"github.com/gdamore/tcell"

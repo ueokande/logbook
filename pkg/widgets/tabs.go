@@ -11,8 +11,13 @@ var (
 	styleTabBackground = tcell.StyleDefault.Background(tcell.ColorWhite)
 )
 
+type tabsItem struct {
+	name string
+	text *views.Text
+}
+
 type Tabs struct {
-	texts    []*views.Text
+	items    []tabsItem
 	selected int
 
 	views.BoxLayout
@@ -28,20 +33,27 @@ func NewTabs() *Tabs {
 	return w
 }
 
-func (w *Tabs) AddTab(label string) {
+func (w *Tabs) AddTab(name string) {
 	text := &views.Text{}
-	text.SetText(" " + label + " ")
+	text.SetText(" " + name + " ")
 	text.SetStyle(styleTabInactive)
 
 	w.AddWidget(text, 0)
-	w.texts = append(w.texts, text)
+	w.items = append(w.items, tabsItem{
+		name: name,
+		text: text,
+	})
+}
+
+func (w *Tabs) TabCount() int {
+	return len(w.items)
 }
 
 func (w *Tabs) Clear() {
-	for _, t := range w.texts {
-		w.RemoveWidget(t)
+	for _, item := range w.items {
+		w.RemoveWidget(item.text)
 	}
-	w.texts = nil
+	w.items = nil
 	w.selected = -1
 }
 
@@ -50,20 +62,20 @@ func (w *Tabs) SelectAt(index int) {
 		return
 	}
 	if w.selected >= 0 {
-		text := w.texts[w.selected]
-		text.SetStyle(styleTabInactive)
+		item := w.items[w.selected]
+		item.text.SetStyle(styleTabInactive)
 	}
-	if index < 0 || index >= len(w.texts) {
+	if index < 0 || index >= len(w.items) {
 		return
 	}
 	w.selected = index
-	text := w.texts[w.selected]
-	text.SetStyle(styleTabActive)
+	item := w.items[w.selected]
+	item.text.SetStyle(styleTabActive)
 
 	w.PostEventWidgetContent(w)
 
 	ev := &EventItemSelected{
-		Name:   text.Text(),
+		Name:   item.name,
 		Index:  index,
 		widget: w,
 	}

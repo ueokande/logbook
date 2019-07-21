@@ -10,6 +10,7 @@ jobs:
     executor:
       name: default
     steps:
+      - checkout
       - run: make lint
       - run: make test
       - run: make

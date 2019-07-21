@@ -11,6 +11,10 @@ jobs:
       name: default
     steps:
       - checkout
+      - run:
+          name: Setup
+          command: |
+            go get -u golang.org/x/lint/golint
       - run: make lint
       - run: make test
       - run: make

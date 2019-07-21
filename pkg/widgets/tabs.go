@@ -16,6 +16,7 @@ type tabsItem struct {
 	text *views.Text
 }
 
+// Tabs is a View with multiple items in single line.
 type Tabs struct {
 	items    []tabsItem
 	selected int
@@ -24,6 +25,7 @@ type Tabs struct {
 	views.WidgetWatchers
 }
 
+// NewTabs returns a new Tabs.
 func NewTabs() *Tabs {
 	w := &Tabs{
 		selected: -1,
@@ -33,6 +35,7 @@ func NewTabs() *Tabs {
 	return w
 }
 
+// AddTab adds a new item with the name.
 func (w *Tabs) AddTab(name string) {
 	text := &views.Text{}
 	text.SetText(" " + name + " ")
@@ -45,10 +48,12 @@ func (w *Tabs) AddTab(name string) {
 	})
 }
 
+// TabCount returns the count of the tabs.
 func (w *Tabs) TabCount() int {
 	return len(w.items)
 }
 
+// Clear clears current tabs.
 func (w *Tabs) Clear() {
 	for _, item := range w.items {
 		w.RemoveWidget(item.text)
@@ -57,6 +62,7 @@ func (w *Tabs) Clear() {
 	w.selected = -1
 }
 
+// SelectAt selects the tab of the index in items.
 func (w *Tabs) SelectAt(index int) {
 	if index == w.selected {
 		return

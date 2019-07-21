@@ -3,24 +3,20 @@ package main
 import (
 	"context"
 
-	"github.com/gdamore/tcell"
 	"github.com/gdamore/tcell/views"
 	"github.com/ueokande/logbook/pkg/k8s"
+	"github.com/ueokande/logbook/pkg/types"
 	"github.com/ueokande/logbook/pkg/ui"
 	corev1 "k8s.io/api/core/v1"
 )
 
-var (
-	StylePodActive  = tcell.StyleDefault.Foreground(tcell.ColorGreen)
-	StylePodError   = tcell.StyleDefault.Foreground(tcell.ColorRed)
-	StylePodPending = tcell.StyleDefault.Foreground(tcell.ColorYellow)
-)
-
+// AppConfig is a config for Logbook App
 type AppConfig struct {
 	Cluster   string
 	Namespace string
 }
 
+// App is an application of logbook
 type App struct {
 	client *k8s.Client
 	ui     *ui.UI
@@ -34,6 +30,7 @@ type App struct {
 	*views.Application
 }
 
+// NewApp returns new App instance
 func NewApp(client *k8s.Client, config *AppConfig) *App {
 	w := ui.NewUI()
 	w.SetContext(config.Cluster, config.Namespace)
@@ -44,8 +41,8 @@ func NewApp(client *k8s.Client, config *AppConfig) *App {
 		ui:     w,
 
 		namespace: config.Namespace,
-		logworker: NewWorker(context.Background()),
-		podworker: NewWorker(context.Background()),
+		logworker: NewWorker(context.TODO()),
+		podworker: NewWorker(context.TODO()),
 
 		Application: new(views.Application),
 	}
@@ -56,12 +53,14 @@ func NewApp(client *k8s.Client, config *AppConfig) *App {
 	return app
 }
 
+// OnContainerSelected handles events on container selected by UI
 func (app *App) OnContainerSelected(name string, index int) {
 	pod := app.currentPod
 	app.ui.ClearPager()
 	app.StartTailLog(pod.Namespace, pod.Name, name)
 }
 
+// OnPodSelected handles events on pod selected by UI
 func (app *App) OnPodSelected(name string, index int) {
 	app.currentPod = app.pods[index]
 	pod := app.currentPod
@@ -72,10 +71,12 @@ func (app *App) OnPodSelected(name string, index int) {
 	app.ui.SelectContainerAt(0)
 }
 
+// OnQuit handles events on quit is required by UI
 func (app *App) OnQuit() {
 	app.Quit()
 }
 
+// StartTailLog starts tailing logs for container of pod in namespace
 func (app *App) StartTailLog(namespace, pod, container string) {
 	app.StopTailLog()
 
@@ -105,11 +106,13 @@ func (app *App) StartTailLog(namespace, pod, container string) {
 	})
 }
 
+// StopTailLog stops tailing logs
 func (app *App) StopTailLog() {
 	app.logworker.Stop()
 	// TODO handle err
 }
 
+// StartTailPods tarts tailing pods on Kubernetes
 func (app *App) StartTailPods() {
 	app.StopTailLog()
 	app.podworker.Start(func(ctx context.Context) error {
@@ -124,12 +127,12 @@ func (app *App) StartTailPods() {
 				switch ev.Type {
 				case k8s.PodAdded:
 					app.pods = append(app.pods, pod)
-					app.ui.AddPod(pod.Name, k8s.GetPodStatus(pod))
+					app.ui.AddPod(pod.Name, types.GetPodStatus(pod))
 					if len(app.pods) == 1 {
 						app.ui.SelectPodAt(0)
 					}
 				case k8s.PodModified:
-					app.ui.SetPodStatus(pod.Name, k8s.GetPodStatus(pod))
+					app.ui.SetPodStatus(pod.Name, types.GetPodStatus(pod))
 				case k8s.PodDeleted:
 					for i, p := range app.pods {
 						if p.Name == pod.Name {
@@ -146,11 +149,13 @@ func (app *App) StartTailPods() {
 	})
 }
 
+// StopTailPods stops tailing pods
 func (app *App) StopTailPods() {
 	app.podworker.Stop()
 	// TODO handle err
 }
 
+// Run starts logbook application
 func (app *App) Run(ctx context.Context) error {
 	app.StartTailPods()
 	return app.Application.Run()

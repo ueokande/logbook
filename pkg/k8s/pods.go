@@ -8,19 +8,24 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 )
 
+// PodEventType represents an event type of the pod
 type PodEventType int
 
+// The event type of the pods
 const (
-	PodAdded PodEventType = iota
-	PodModified
-	PodDeleted
+	PodAdded    PodEventType = iota // The pod is added
+	PodModified                     // The pod is updated
+	PodDeleted                      // The pod is deleted
 )
 
+// PodEvent represents an event of the pods in Kubernetes API
 type PodEvent struct {
 	Type PodEventType
 	Pod  *corev1.Pod
 }
 
+// WatchPods watches pods from Kubernetes API in namespace.  It returns a
+// channel to subscribe pods.
 func (c *Client) WatchPods(ctx context.Context, namespace string) (<-chan *PodEvent, error) {
 	r, err := c.clientset.CoreV1().Pods(namespace).Watch(metav1.ListOptions{})
 	if err != nil {

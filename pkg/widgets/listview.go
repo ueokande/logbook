@@ -11,6 +11,7 @@ type item struct {
 	view *views.ViewPort
 }
 
+// ListView is a Widget with containing multiple items as a list
 type ListView struct {
 	view     views.View
 	items    []item
@@ -22,12 +23,16 @@ type ListView struct {
 	views.WidgetWatchers
 }
 
+// NewListView returns a new ListView
 func NewListView() *ListView {
 	return &ListView{
 		selected: -1,
 	}
 }
 
+// AddItem adds a new item with the text and its style.  The text must be
+// unique in the list view.  It panics when the text is already exists in the
+// list
 func (w *ListView) AddItem(text string, style tcell.Style) {
 	if w.getItemIndex(text) != -1 {
 		panic("item " + text + " already exists")
@@ -50,6 +55,8 @@ func (w *ListView) AddItem(text string, style tcell.Style) {
 	w.PostEventWidgetContent(w)
 }
 
+// SetStyle updates the style of the text.  It panics when the text does not
+// exist in the list.
 func (w *ListView) SetStyle(text string, style tcell.Style) {
 	idx := w.getItemIndex(text)
 	if idx == -1 {
@@ -62,6 +69,8 @@ func (w *ListView) SetStyle(text string, style tcell.Style) {
 	w.PostEventWidgetContent(w)
 }
 
+// DeleteItem deletes a item with the text.  It panics when the text does not
+// exist in the list
 func (w *ListView) DeleteItem(text string) {
 	idx := w.getItemIndex(text)
 	if idx == -1 {
@@ -72,6 +81,7 @@ func (w *ListView) DeleteItem(text string) {
 	w.items = append(w.items[:idx], w.items[idx+1:]...)
 }
 
+// ItemCount returns the count of the items.
 func (w *ListView) ItemCount() int {
 	return len(w.items)
 }
@@ -85,6 +95,7 @@ func (w *ListView) getItemIndex(name string) int {
 	return -1
 }
 
+// SelectAt selects nth items by the index.
 func (w *ListView) SelectAt(index int) {
 	if index == w.selected {
 		return
@@ -113,6 +124,7 @@ func (w *ListView) SelectAt(index int) {
 	w.PostEvent(ev)
 }
 
+// Draw draws the ListView
 func (w *ListView) Draw() {
 	if w.view == nil {
 		return
@@ -125,11 +137,13 @@ func (w *ListView) Draw() {
 	}
 }
 
+// Resize is called when our View changes sizes.
 func (w *ListView) Resize() {
 	w.layout()
 	w.PostEventWidgetResize(w)
 }
 
+// HandleEvent handles events on tcell
 func (w *ListView) HandleEvent(ev tcell.Event) bool {
 	switch ev.(type) {
 	case *views.EventWidgetContent:
@@ -146,6 +160,7 @@ func (w *ListView) HandleEvent(ev tcell.Event) bool {
 
 }
 
+// SetView sets the View object used for the list view
 func (w *ListView) SetView(view views.View) {
 	w.view = view
 	for _, item := range w.items {
@@ -154,6 +169,7 @@ func (w *ListView) SetView(view views.View) {
 	w.changed = true
 }
 
+// Size returns the width and height in vertical line.
 func (w *ListView) Size() (int, int) {
 	return w.width, w.height
 }

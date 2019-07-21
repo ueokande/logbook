@@ -1,4 +1,4 @@
-package ui
+package widgets
 
 import (
 	"github.com/gdamore/tcell"
@@ -72,6 +72,10 @@ func (w *ListView) DeleteItem(text string) {
 	w.items = append(w.items[:idx], w.items[idx+1:]...)
 }
 
+func (w *ListView) ItemCount() int {
+	return len(w.items)
+}
+
 func (w *ListView) getItemIndex(name string) int {
 	for i, item := range w.items {
 		if item.name == name {
@@ -98,6 +102,15 @@ func (w *ListView) SelectAt(index int) {
 	i.text.SetStyle(i.text.Style().Reverse(true))
 
 	w.PostEventWidgetContent(w)
+
+	ev := &EventItemSelected{
+		Name:   i.name,
+		Index:  index,
+		widget: w,
+	}
+	ev.SetEventNow()
+
+	w.PostEvent(ev)
 }
 
 func (w *ListView) Draw() {

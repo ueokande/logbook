@@ -1,19 +1,13 @@
 package main
 
 import (
-	"bufio"
 	"context"
-	"fmt"
-	"net/url"
 
 	"github.com/gdamore/tcell"
 	"github.com/gdamore/tcell/views"
-	"github.com/pkg/errors"
-	"github.com/ueokande/logbook/ui"
+	"github.com/ueokande/logbook/pkg/k8s"
+	"github.com/ueokande/logbook/pkg/ui"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/kubernetes"
 )
 
 var (
@@ -28,56 +22,26 @@ type AppConfig struct {
 }
 
 type App struct {
-	clientset *kubernetes.Clientset
+	client *k8s.Client
+	ui     *ui.UI
 
-	mainLayout   *views.BoxLayout
-	detailLayout *views.BoxLayout
-	statusbar    *ui.StatusBar
-	tabs         *ui.Tabs
-	podsView     *ui.ListView
-	line         *ui.VerticalLine
-	pager        *ui.Pager
-	pagerEnabled bool
-
-	namespace         string
-	pods              []*corev1.Pod
-	containers        []string
-	selectedPod       int
-	selectedContainer int
-	podworker         *Worker
-	logworker         *Worker
+	namespace  string
+	pods       []*corev1.Pod
+	currentPod *corev1.Pod
+	podworker  *Worker
+	logworker  *Worker
 
 	*views.Application
-	views.BoxLayout
 }
 
-func NewApp(clientset *kubernetes.Clientset, config *AppConfig) *App {
-	statusbar := ui.NewStatusBar()
-	statusbar.SetCenterStatus(fmt.Sprintf("%s/%s", config.Cluster, config.Namespace))
-	podsView := ui.NewListView()
-	line := ui.NewVerticalLine(tcell.RuneVLine, tcell.StyleDefault)
-	pager := ui.NewPager()
-	tabs := ui.NewTabs()
-
-	detailLayout := &views.BoxLayout{}
-	detailLayout.SetOrientation(views.Vertical)
-	detailLayout.AddWidget(tabs, 0)
-	detailLayout.AddWidget(pager, 1)
-
-	mainLayout := &views.BoxLayout{}
-	mainLayout.SetOrientation(views.Horizontal)
-	mainLayout.AddWidget(podsView, 0)
+func NewApp(client *k8s.Client, config *AppConfig) *App {
+	w := ui.NewUI()
+	w.SetContext(config.Cluster, config.Namespace)
+	w.SetStatusMode(ui.ModeNormal)
 
 	app := &App{
-		clientset: clientset,
-
-		mainLayout:   mainLayout,
-		detailLayout: detailLayout,
-		statusbar:    statusbar,
-		tabs:         tabs,
-		podsView:     podsView,
-		line:         line,
-		pager:        pager,
+		client: client,
+		ui:     w,
 
 		namespace: config.Namespace,
 		logworker: NewWorker(context.Background()),
@@ -86,269 +50,95 @@ func NewApp(clientset *kubernetes.Clientset, config *AppConfig) *App {
 		Application: new(views.Application),
 	}
 
-	app.SetOrientation(views.Vertical)
-	app.AddWidget(mainLayout, 1)
-	app.AddWidget(statusbar, 0)
-	app.SetRootWidget(app)
+	w.WatchUIEvents(app)
+	app.SetRootWidget(w)
 
 	return app
 }
 
-func (app *App) HandleEvent(ev tcell.Event) bool {
-	switch ev := ev.(type) {
-	case *tcell.EventKey:
-		switch ev.Key() {
-		case tcell.KeyEnter:
-			app.ShowPager()
-			return true
-		case tcell.KeyCtrlC:
-			app.Quit()
-			return true
-		case tcell.KeyCtrlP:
-			app.SelectPrevPod()
-			return true
-		case tcell.KeyCtrlN:
-			app.SelectNextPod()
-			return true
-		case tcell.KeyCtrlD:
-			app.pager.ScrollHalfPageDown()
-			app.UpdateScrollStatus()
-			return true
-		case tcell.KeyCtrlU:
-			app.pager.ScrollHalfPageUp()
-			app.UpdateScrollStatus()
-			return true
-		case tcell.KeyCtrlB:
-			app.pager.ScrollPageUp()
-			app.UpdateScrollStatus()
-			return true
-		case tcell.KeyCtrlF:
-			app.pager.ScrollPageDown()
-			app.UpdateScrollStatus()
-			return true
-		case tcell.KeyTab:
-			app.SelectNextContainer()
-			return true
-		case tcell.KeyRune:
-			switch ev.Rune() {
-			case 'q':
-				if app.pagerEnabled {
-					app.HidePager()
-				} else {
-					app.Quit()
-				}
-				return true
-			case 'k':
-				if app.pagerEnabled {
-					app.pager.ScrollUp()
-					app.UpdateScrollStatus()
-				} else {
-					app.SelectPrevPod()
-				}
-				return true
-			case 'j':
-				if app.pagerEnabled {
-					app.pager.ScrollDown()
-					app.UpdateScrollStatus()
-				} else {
-					app.SelectNextPod()
-				}
-				return true
-			case 'g':
-				app.pager.ScrollToTop()
-				return true
-			case 'G':
-				app.pager.ScrollToBottom()
-				return true
-			}
-		}
-	}
-	return app.BoxLayout.HandleEvent(ev)
+func (app *App) OnContainerSelected(name string, index int) {
+	pod := app.currentPod
+	app.ui.ClearPager()
+	app.StartTailLog(pod.Namespace, pod.Name, name)
 }
 
-func (app *App) SelectNextPod() {
-	app.SelectPodAt(app.selectedPod + 1)
+func (app *App) OnPodSelected(name string, index int) {
+	app.currentPod = app.pods[index]
+	pod := app.currentPod
+	app.ui.ClearContainers()
+	for _, c := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
+		app.ui.AddContainer(c.Name)
+	}
+	app.ui.SelectContainerAt(0)
 }
 
-func (app *App) SelectPrevPod() {
-	app.SelectPodAt(app.selectedPod - 1)
-}
-
-func (app *App) SelectPodAt(index int) {
-	if index < 0 {
-		index = 0
-	}
-	if index > len(app.pods)-1 {
-		index = len(app.pods) - 1
-	}
-	app.selectedPod = index
-
-	app.podsView.SelectAt(app.selectedPod)
-
-	if app.pagerEnabled {
-		pod := app.pods[app.selectedPod]
-		app.containers = nil
-		app.tabs.Clear()
-		for _, c := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
-			app.tabs.AddTab(c.Name)
-			app.containers = append(app.containers, c.Name)
-		}
-		app.SelectContainerAt(0)
-	}
-}
-
-func (app *App) UpdateScrollStatus() {
-	y := app.pager.GetScrollYPosition()
-	app.statusbar.SetRightStatus(fmt.Sprintf("%3d%%", int(y*100)))
-}
-
-func (app *App) SelectNextContainer() {
-	index := app.selectedContainer + 1
-	if index > len(app.containers)-1 {
-		index = 0
-	}
-	app.SelectContainerAt(index)
-}
-
-func (app *App) SelectContainerAt(index int) {
-	if index < 0 {
-		index = 0
-	}
-	if index > len(app.pods)-1 {
-		index = len(app.pods) - 1
-	}
-	app.selectedContainer = index
-
-	app.tabs.SelectAt(index)
-	app.UpdateScrollStatus()
-
-	pod := app.pods[app.selectedPod]
-	container := app.containers[app.selectedContainer]
-	app.StartTailLog(pod.Namespace, pod.Name, container)
-}
-
-func (app *App) ShowPager() {
-	if app.pagerEnabled {
-		return
-	}
-	app.mainLayout.AddWidget(app.line, 0)
-	app.mainLayout.AddWidget(app.detailLayout, 1)
-	app.pagerEnabled = true
-
-	app.SelectPodAt(app.selectedPod)
-}
-
-func (app *App) HidePager() {
-	app.mainLayout.RemoveWidget(app.line)
-	app.mainLayout.RemoveWidget(app.detailLayout)
-	app.pagerEnabled = false
-
-	app.StopTailLog()
+func (app *App) OnQuit() {
+	app.Quit()
 }
 
 func (app *App) StartTailLog(namespace, pod, container string) {
 	app.StopTailLog()
 
-	app.pager.ClearText()
 	app.logworker.Start(func(ctx context.Context) error {
-		opts := &corev1.PodLogOptions{
-			Container: container,
-			Follow:    true,
-		}
-		req := app.clientset.CoreV1().Pods(namespace).GetLogs(pod, opts)
-		req.Context(ctx)
-		r, err := req.Stream()
+		logs, err := app.client.WatchLogs(ctx, namespace, pod, container)
 		if err != nil {
 			return err
 		}
-		defer r.Close()
-
-		s := bufio.NewScanner(r)
 
 		// make channel to guarantee line order of logs
 		ch := make(chan string)
 		defer close(ch)
-		for s.Scan() {
+		for log := range logs {
 			app.PostFunc(func() {
 				for line := range ch {
-					app.pager.AppendLine(line)
-					app.UpdateScrollStatus()
+					app.ui.AddPagerText(line)
 					break
 				}
 			})
 			select {
-			case ch <- s.Text():
+			case ch <- log:
 			case <-ctx.Done():
 				return nil
 			}
 		}
-		return s.Err()
+		return nil
 	})
 }
 
 func (app *App) StopTailLog() {
-	err := app.logworker.Stop()
-	err = errors.Cause(err)
-	if err == context.Canceled {
-		return
-	}
-	if uerr, ok := err.(*url.Error); ok && uerr.Err == context.Canceled {
-		return
-	}
-	if err != nil {
-		// TODO handle err
-	}
+	app.logworker.Stop()
+	// TODO handle err
 }
 
 func (app *App) StartTailPods() {
 	app.StopTailLog()
 	app.podworker.Start(func(ctx context.Context) error {
-		result, err := app.clientset.CoreV1().Pods(app.namespace).Watch(metav1.ListOptions{})
+		events, err := app.client.WatchPods(ctx, app.namespace)
 		if err != nil {
 			return err
 		}
-
-		for ev := range result.ResultChan() {
+		for ev := range events {
 			ev := ev
-			pod, ok := ev.Object.(*corev1.Pod)
-			if !ok {
-				continue
-			}
-
 			app.PostFunc(func() {
+				pod := ev.Pod
 				switch ev.Type {
-				case watch.Added:
+				case k8s.PodAdded:
 					app.pods = append(app.pods, pod)
-					switch GetPodStatus(pod) {
-					case PodRunning, PodSucceeded:
-						app.podsView.AddItem(pod.Name, StylePodActive)
-					case PodPending, PodInitializing, PodTerminating:
-						app.podsView.AddItem(pod.Name, StylePodPending)
-					default:
-						app.podsView.AddItem(pod.Name, StylePodError)
-					}
+					app.ui.AddPod(pod.Name, k8s.GetPodStatus(pod))
 					if len(app.pods) == 1 {
-						app.podsView.SelectAt(0)
+						app.ui.SelectPodAt(0)
 					}
-				case watch.Modified:
-					switch GetPodStatus(pod) {
-					case PodRunning, PodSucceeded:
-						app.podsView.SetStyle(pod.Name, StylePodActive)
-					case PodPending, PodInitializing, PodTerminating:
-						app.podsView.SetStyle(pod.Name, StylePodPending)
-					default:
-						app.podsView.SetStyle(pod.Name, StylePodError)
-					}
-				case watch.Deleted:
+				case k8s.PodModified:
+					app.ui.SetPodStatus(pod.Name, k8s.GetPodStatus(pod))
+				case k8s.PodDeleted:
 					for i, p := range app.pods {
 						if p.Name == pod.Name {
 							app.pods = append(app.pods[:i], app.pods[i+1:]...)
 							break
 						}
 					}
-					app.podsView.DeleteItem(pod.Name)
+					app.ui.DeletePod(pod.Name)
 				}
-				app.statusbar.SetLeftStatus(fmt.Sprintf("%d Pods", len(app.pods)))
 			})
 
 		}
@@ -357,17 +147,8 @@ func (app *App) StartTailPods() {
 }
 
 func (app *App) StopTailPods() {
-	err := app.podworker.Stop()
-	err = errors.Cause(err)
-	if err == context.Canceled {
-		return
-	}
-	if uerr, ok := err.(*url.Error); ok && uerr.Err == context.Canceled {
-		return
-	}
-	if err != nil {
-		// TODO handle err
-	}
+	app.podworker.Stop()
+	// TODO handle err
 }
 
 func (app *App) Run(ctx context.Context) error {

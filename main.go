@@ -5,9 +5,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-	"k8s.io/client-go/kubernetes"
+	"github.com/ueokande/logbook/pkg/k8s"
 )
 
 var homedir string
@@ -38,12 +37,28 @@ func main() {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		config, clientset, err := loadConfig(&params)
+		context, err := k8s.LoadCurrentContext(params.kubeconfig)
 		if err != nil {
 			return err
 		}
 
-		app := NewApp(clientset, config)
+		client, err := k8s.NewClient(params.kubeconfig)
+		if err != nil {
+			return err
+		}
+
+		config := &AppConfig{
+			Cluster:   context.Cluster,
+			Namespace: "default",
+		}
+		if len(context.Namespace) > 0 {
+			config.Namespace = context.Namespace
+		}
+		if len(params.namespace) > 0 {
+			config.Namespace = context.Namespace
+		}
+
+		app := NewApp(client, config)
 		err = app.Run(ctx)
 		if err != nil {
 			return err
@@ -56,34 +71,4 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-}
-
-func loadConfig(params *Params) (*AppConfig, *kubernetes.Clientset, error) {
-	kubeConfig := GetKubeConfig(params.kubeconfig)
-	rawConfig, err := kubeConfig.RawConfig()
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed to get raw config")
-	}
-	clientConfig, err := kubeConfig.ClientConfig()
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed to get client config")
-	}
-
-	context := rawConfig.Contexts[rawConfig.CurrentContext]
-	config := &AppConfig{
-		Cluster:   context.Cluster,
-		Namespace: "default",
-	}
-	if len(context.Namespace) > 0 {
-		config.Namespace = context.Namespace
-	}
-	if len(params.namespace) > 0 {
-		config.Namespace = context.Namespace
-	}
-	clientset, err := kubernetes.NewForConfig(clientConfig)
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed to create clientset")
-	}
-
-	return config, clientset, nil
 }

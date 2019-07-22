@@ -7,11 +7,13 @@ import (
 	"github.com/gdamore/tcell/views"
 )
 
+// Mode represents a mode on UI
 type Mode int
 
+// UI mode
 const (
-	ModeNormal Mode = iota
-	ModeFollow
+	ModeNormal Mode = iota // Normal mode
+	ModeFollow             // Follow mode
 )
 
 var (
@@ -22,6 +24,7 @@ var (
 	styleStatusBarScroll     = tcell.StyleDefault.Background(tcell.ColorGray).Foreground(tcell.ColorWhite)
 )
 
+// StatusBar is a status bar on the bottom of the UI
 type StatusBar struct {
 	mode    *views.Text
 	pods    *views.Text
@@ -30,6 +33,7 @@ type StatusBar struct {
 	views.BoxLayout
 }
 
+// NewStatusBar returns a new status bar
 func NewStatusBar() *StatusBar {
 	mode := &views.Text{}
 	mode.SetStyle(styleStatusBarPods)
@@ -54,6 +58,7 @@ func NewStatusBar() *StatusBar {
 	return w
 }
 
+// SetMode sets current mode on the status bar
 func (w *StatusBar) SetMode(mode Mode) {
 	switch mode {
 	case ModeNormal:
@@ -67,14 +72,18 @@ func (w *StatusBar) SetMode(mode Mode) {
 	}
 }
 
+// SetContext sets current kubeconfig context (cluster name and namespace) on
+// the status bar
 func (w *StatusBar) SetContext(cluster, namespace string) {
 	w.context.SetText(fmt.Sprintf("%s/%s", cluster, namespace))
 }
 
+// SetPodCount sets the count of the pods
 func (w *StatusBar) SetPodCount(count int) {
 	w.pods.SetText(fmt.Sprintf(" %d Pods ", count))
 }
 
+// SetScroll sets the percent of the scroll
 func (w *StatusBar) SetScroll(percent int) {
 	w.scroll.SetText(fmt.Sprintf(" %d%% ", percent))
 }

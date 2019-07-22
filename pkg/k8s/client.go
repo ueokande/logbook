@@ -7,10 +7,13 @@ import (
 	"k8s.io/client-go/tools/clientcmd/api"
 )
 
+// Client is a wrapper for a Kubernetes client
 type Client struct {
 	clientset *kubernetes.Clientset
 }
 
+// NewClient loads Kubernetes configuration by the kubeconfig and returns new
+// Client
 func NewClient(kubeconfig string) (*Client, error) {
 	kubeConfig := getKubeConfig(kubeconfig)
 	clientConfig, err := kubeConfig.ClientConfig()
@@ -27,6 +30,7 @@ func NewClient(kubeconfig string) (*Client, error) {
 	}, nil
 }
 
+// LoadCurrentContext loads a context in KUBECONFIG and returns it
 func LoadCurrentContext(kubeconfig string) (*api.Context, error) {
 	kubeConfig := getKubeConfig(kubeconfig)
 	rawConfig, err := kubeConfig.RawConfig()

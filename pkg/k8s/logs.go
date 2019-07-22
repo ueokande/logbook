@@ -7,6 +7,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
+// WatchLogs watches container's logs of pod in namespace.  It returns channels
+// to subscribe log lines.
 func (c *Client) WatchLogs(ctx context.Context, namespace, pod, container string) (<-chan string, error) {
 	opts := &corev1.PodLogOptions{
 		Container: container,
@@ -19,6 +21,7 @@ func (c *Client) WatchLogs(ctx context.Context, namespace, pod, container string
 		return nil, err
 	}
 
+	// TODO handle s.Err()
 	s := bufio.NewScanner(r)
 
 	ch := make(chan string)

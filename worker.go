@@ -5,6 +5,7 @@ import (
 	"sync"
 )
 
+// Worker is a worker for asynchronous jobs
 type Worker struct {
 	ctx    context.Context
 	wg     sync.WaitGroup
@@ -12,12 +13,14 @@ type Worker struct {
 	err    error
 }
 
+// NewWorker creates a new Worker with the ctx
 func NewWorker(ctx context.Context) *Worker {
 	return &Worker{
 		ctx: ctx,
 	}
 }
 
+// Start starts a background job presented by f
 func (w *Worker) Start(f func(ctx context.Context) error) {
 	if w.cancel != nil {
 		panic("worker is already started")
@@ -33,6 +36,7 @@ func (w *Worker) Start(f func(ctx context.Context) error) {
 	}()
 }
 
+// Stop stops current asynchronous jobs and returns last error occurs in the job
 func (w *Worker) Stop() error {
 	if w.cancel == nil {
 		return nil

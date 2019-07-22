@@ -13,10 +13,16 @@ var (
 	stylePodPending = tcell.StyleDefault.Foreground(tcell.ColorYellow)
 )
 
-type UIEventListener interface {
+// EventListener is a listener interface for UI events
+type EventListener interface {
+	// OnQuit is invoked on the quit is required
 	OnQuit()
-	OnContainerSelected(name string, index int)
+
+	// OnPodSelected is invoked when the selected pod is changed
 	OnPodSelected(name string, index int)
+
+	// OnContainerSelected is invoked when the selected container is changed
+	OnContainerSelected(name string, index int)
 }
 
 type nopListener struct{}
@@ -27,6 +33,7 @@ func (l nopListener) OnPodSelected(name string, index int) {}
 
 func (l nopListener) OnQuit() {}
 
+// UI is an user interface for the logbook
 type UI struct {
 	pods       *widgets.ListView
 	containers *widgets.Tabs
@@ -37,11 +44,12 @@ type UI struct {
 	podIndex          int
 	selectedContainer int
 
-	listener UIEventListener
+	listener EventListener
 
 	views.BoxLayout
 }
 
+// NewUI returns new UI
 func NewUI() *UI {
 	statusbar := NewStatusBar()
 	pods := widgets.NewListView()
@@ -78,36 +86,44 @@ func NewUI() *UI {
 	return ui
 }
 
-func (ui *UI) WatchUIEvents(l UIEventListener) {
+// WatchUIEvents registers an EventListener for the UI
+func (ui *UI) WatchUIEvents(l EventListener) {
 	ui.listener = l
 }
 
+// AddPod adds a pod by the name and its status to the list view.
 func (ui *UI) AddPod(name string, status types.PodStatus) {
 	ui.pods.AddItem(name, podStatusStyle(status))
 	ui.statusbar.SetPodCount(ui.pods.ItemCount())
 }
 
+// DeletePod deletes pod by the name on the list view.
 func (ui *UI) DeletePod(name string) {
 	ui.pods.DeleteItem(name)
 	ui.statusbar.SetPodCount(ui.pods.ItemCount())
 }
 
+// SetPodStatus updates the pod status by name to the status
 func (ui *UI) SetPodStatus(name string, status types.PodStatus) {
 	ui.pods.SetStyle(name, podStatusStyle(status))
 }
 
+// AddContainer adds container by the name into the tabs
 func (ui *UI) AddContainer(name string) {
 	ui.containers.AddTab(name)
 }
 
+// ClearContainers clears containers in the tabs
 func (ui *UI) ClearContainers() {
 	ui.containers.Clear()
 }
 
-func (ui *UI) SetContext(cluster, context string) {
-	ui.statusbar.SetContext(cluster, context)
+// SetContext sets kubenetes context (the cluster name and the namespace)
+func (ui *UI) SetContext(cluster, namespace string) {
+	ui.statusbar.SetContext(cluster, namespace)
 }
 
+// HandleEvent handles events on tcell
 func (ui *UI) HandleEvent(ev tcell.Event) bool {
 	switch ev := ev.(type) {
 	case *widgets.EventItemSelected:
@@ -169,6 +185,7 @@ func (ui *UI) HandleEvent(ev tcell.Event) bool {
 	return false
 }
 
+// AddPagerText adds text line into the pager
 func (ui *UI) AddPagerText(line string) {
 	ui.pager.AppendLine(line)
 	if ui.follow {
@@ -177,12 +194,14 @@ func (ui *UI) AddPagerText(line string) {
 	ui.updateScrollStatus()
 }
 
+// ClearPager clears the pager
 func (ui *UI) ClearPager() {
 	ui.pager.ClearText()
 	ui.updateScrollStatus()
 	ui.DisableFollowMode()
 }
 
+// SetStatusMode sets the mode in the status bar
 func (ui *UI) SetStatusMode(mode Mode) {
 	ui.statusbar.SetMode(mode)
 }
@@ -259,6 +278,7 @@ func (ui *UI) toggleFollowMode() {
 	}
 }
 
+// EnableFollowMode enabled follow mode on the pager
 func (ui *UI) EnableFollowMode() {
 	ui.follow = true
 	ui.statusbar.SetMode(ModeFollow)
@@ -266,6 +286,7 @@ func (ui *UI) EnableFollowMode() {
 	ui.updateScrollStatus()
 }
 
+// DisableFollowMode disables follow mode on the pager
 func (ui *UI) DisableFollowMode() {
 	ui.follow = false
 	ui.statusbar.SetMode(ModeNormal)
@@ -289,6 +310,7 @@ func (ui *UI) selectPrevPod() {
 	}
 }
 
+// SelectPodAt selects a pod by the index
 func (ui *UI) SelectPodAt(index int) {
 	ui.podIndex = index
 	ui.pods.SelectAt(index)
@@ -303,6 +325,7 @@ func (ui *UI) selectNextContainer() {
 	ui.containers.SelectAt(index)
 }
 
+// SelectContainerAt selects a container by the index
 func (ui *UI) SelectContainerAt(index int) {
 	ui.containers.SelectAt(index)
 }

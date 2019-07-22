@@ -17,10 +17,44 @@ jobs:
             go get -u golang.org/x/lint/golint
       - run: make lint
       - run: make test
-      - run: make
+      - run: make build
+
+  deploy:
+    executor:
+      name: default
+    steps:
+      - checkout
+      - run:
+          name: Install deploy tool
+          command: |
+            cd scripts/deploy
+            go install .
+      - run:
+          name: Deploy binaries
+          command: |
+            make binaries
+            deploy "$CIRCLE_TAG" logbook_darwin_amd64
+            deploy "$CIRCLE_TAG" logbook_linux_amd64
+            deploy "$CIRCLE_TAG" logbook_windows_amd64.exe
 
 workflows:
   version: 2
-  build_and_test:
+  build:
     jobs:
       - build
+  deploy:
+    jobs:
+      - build:
+          filters:
+            tags:
+              only: /.*/
+            branches:
+              ignore: /.*/
+      - deploy:
+          requires:
+            - build
+          filters:
+            tags:
+              only: /^v.*/
+            branches:
+              ignore: /.*/

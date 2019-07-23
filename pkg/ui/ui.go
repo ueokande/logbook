@@ -7,6 +7,15 @@ import (
 	"github.com/ueokande/logbook/pkg/widgets"
 )
 
+// Mode represents a mode on UI
+type Mode int
+
+// UI mode
+const (
+	ModeNormal Mode = iota // Normal mode
+	ModeFollow             // Follow mode
+)
+
 var (
 	stylePodActive  = tcell.StyleDefault.Foreground(tcell.ColorGreen)
 	stylePodError   = tcell.StyleDefault.Foreground(tcell.ColorRed)
@@ -40,7 +49,7 @@ type UI struct {
 	pager      *widgets.Pager
 	statusbar  *StatusBar
 
-	follow            bool
+	mode              Mode
 	podIndex          int
 	selectedContainer int
 
@@ -188,7 +197,7 @@ func (ui *UI) HandleEvent(ev tcell.Event) bool {
 // AddPagerText adds text line into the pager
 func (ui *UI) AddPagerText(line string) {
 	ui.pager.AppendLine(line)
-	if ui.follow {
+	if ui.mode == ModeFollow {
 		ui.pager.ScrollToBottom()
 	}
 	ui.updateScrollStatus()
@@ -207,7 +216,7 @@ func (ui *UI) SetStatusMode(mode Mode) {
 }
 
 func (ui *UI) scrollDown() {
-	if ui.follow {
+	if ui.mode == ModeFollow {
 		return
 	}
 	ui.pager.ScrollDown()
@@ -215,7 +224,7 @@ func (ui *UI) scrollDown() {
 }
 
 func (ui *UI) scrollUp() {
-	if ui.follow {
+	if ui.mode == ModeFollow {
 		return
 	}
 	ui.pager.ScrollUp()
@@ -223,7 +232,7 @@ func (ui *UI) scrollUp() {
 }
 
 func (ui *UI) scrollPageDown() {
-	if ui.follow {
+	if ui.mode == ModeFollow {
 		return
 	}
 	ui.pager.ScrollPageDown()
@@ -231,7 +240,7 @@ func (ui *UI) scrollPageDown() {
 }
 
 func (ui *UI) scrollPageUp() {
-	if ui.follow {
+	if ui.mode == ModeFollow {
 		return
 	}
 	ui.pager.ScrollPageUp()
@@ -239,7 +248,7 @@ func (ui *UI) scrollPageUp() {
 }
 
 func (ui *UI) scrollHalfPageDown() {
-	if ui.follow {
+	if ui.mode == ModeFollow {
 		return
 	}
 	ui.pager.ScrollHalfPageDown()
@@ -247,7 +256,7 @@ func (ui *UI) scrollHalfPageDown() {
 }
 
 func (ui *UI) scrollToTop() {
-	if ui.follow {
+	if ui.mode == ModeFollow {
 		return
 	}
 	ui.pager.ScrollToTop()
@@ -255,7 +264,7 @@ func (ui *UI) scrollToTop() {
 }
 
 func (ui *UI) scrollToBottom() {
-	if ui.follow {
+	if ui.mode == ModeFollow {
 		return
 	}
 	ui.pager.ScrollToBottom()
@@ -263,7 +272,7 @@ func (ui *UI) scrollToBottom() {
 }
 
 func (ui *UI) scrollHalfPageUp() {
-	if ui.follow {
+	if ui.mode == ModeFollow {
 		return
 	}
 	ui.pager.ScrollHalfPageUp()
@@ -271,7 +280,7 @@ func (ui *UI) scrollHalfPageUp() {
 }
 
 func (ui *UI) toggleFollowMode() {
-	if ui.follow {
+	if ui.mode == ModeFollow {
 		ui.DisableFollowMode()
 	} else {
 		ui.EnableFollowMode()
@@ -280,7 +289,7 @@ func (ui *UI) toggleFollowMode() {
 
 // EnableFollowMode enabled follow mode on the pager
 func (ui *UI) EnableFollowMode() {
-	ui.follow = true
+	ui.mode = ModeFollow
 	ui.statusbar.SetMode(ModeFollow)
 	ui.pager.ScrollToBottom()
 	ui.updateScrollStatus()
@@ -288,7 +297,7 @@ func (ui *UI) EnableFollowMode() {
 
 // DisableFollowMode disables follow mode on the pager
 func (ui *UI) DisableFollowMode() {
-	ui.follow = false
+	ui.mode = ModeNormal
 	ui.statusbar.SetMode(ModeNormal)
 }
 

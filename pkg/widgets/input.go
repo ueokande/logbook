@@ -36,6 +36,11 @@ func (w *InputLine) SetValue(value string) {
 	w.PostEventWidgetContent(w)
 }
 
+// Value gets current value of the input
+func (w *InputLine) Value() string {
+	return string(w.value)
+}
+
 // SetStyle sets the style of the input
 func (w *InputLine) SetStyle(style tcell.Style) {
 	w.style = style

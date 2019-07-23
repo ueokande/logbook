@@ -12,8 +12,9 @@ type Mode int
 
 // UI mode
 const (
-	ModeNormal Mode = iota // Normal mode
-	ModeFollow             // Follow mode
+	ModeNormal    Mode = iota // Normal mode
+	ModeFollow                // Follow mode
+	ModeInputFind             // Input find mode
 )
 
 var (
@@ -44,12 +45,14 @@ func (l nopListener) OnQuit() {}
 
 // UI is an user interface for the logbook
 type UI struct {
+	input      *widgets.InputLine
 	pods       *widgets.ListView
 	containers *widgets.Tabs
 	pager      *widgets.Pager
 	statusbar  *StatusBar
 
 	mode     Mode
+	keyword  string
 	listener EventListener
 
 	views.BoxLayout
@@ -58,6 +61,7 @@ type UI struct {
 // NewUI returns new UI
 func NewUI() *UI {
 	statusbar := NewStatusBar()
+	input := widgets.NewInputLine()
 	pods := widgets.NewListView()
 	line := widgets.NewVerticalLine(tcell.RuneVLine, tcell.StyleDefault)
 	pager := widgets.NewPager()
@@ -75,6 +79,7 @@ func NewUI() *UI {
 	mainLayout.AddWidget(detailLayout, 1)
 
 	ui := &UI{
+		input:      input,
 		pods:       pods,
 		containers: containers,
 		pager:      pager,
@@ -142,51 +147,7 @@ func (ui *UI) HandleEvent(ev tcell.Event) bool {
 			return true
 		}
 	case *tcell.EventKey:
-		switch ev.Key() {
-		case tcell.KeyCtrlP:
-			ui.pods.SelectPrev()
-			return true
-		case tcell.KeyCtrlN:
-			ui.pods.SelectNext()
-			return true
-		case tcell.KeyCtrlD:
-			ui.scrollHalfPageDown()
-			return true
-		case tcell.KeyCtrlU:
-			ui.scrollHalfPageUp()
-		case tcell.KeyCtrlB:
-			ui.scrollPageDown()
-		case tcell.KeyCtrlF:
-			ui.scrollPageUp()
-			return true
-		case tcell.KeyTab:
-			ui.containers.SelectNext()
-			return true
-		case tcell.KeyCtrlC:
-			ui.listener.OnQuit()
-			return true
-		case tcell.KeyRune:
-			switch ev.Rune() {
-			case 'k':
-				ui.scrollUp()
-				return true
-			case 'j':
-				ui.scrollDown()
-				return true
-			case 'g':
-				ui.scrollToTop()
-				return true
-			case 'G':
-				ui.scrollToBottom()
-				return true
-			case 'f':
-				ui.toggleFollowMode()
-				return true
-			case 'q':
-				ui.listener.OnQuit()
-				return true
-			}
-		}
+		return ui.handleEventKey(ev)
 	}
 	return false
 }
@@ -311,6 +272,35 @@ func (ui *UI) SelectContainerAt(index int) {
 func (ui *UI) updateScrollStatus() {
 	y := ui.pager.GetScrollYPosition()
 	ui.statusbar.SetScroll(int(y * 100))
+}
+
+func (ui *UI) enterFindInputMode() {
+	ui.input.SetPrompt("/")
+	ui.mode = ModeInputFind
+	ui.RemoveWidget(ui.statusbar)
+	ui.AddWidget(ui.input, 0)
+}
+
+func (ui *UI) cancelInput() {
+	ui.mode = ModeNormal
+	ui.RemoveWidget(ui.statusbar)
+	ui.AddWidget(ui.input, 0)
+}
+
+func (ui *UI) startFind() {
+	ui.keyword = ui.input.Value()
+	ui.mode = ModeNormal
+	ui.AddWidget(ui.statusbar, 0)
+	ui.RemoveWidget(ui.input)
+	ui.findNext()
+}
+
+func (ui *UI) findNext() {
+	panic("TODO: implement")
+}
+
+func (ui *UI) findPrev() {
+	panic("TODO: implement")
 }
 
 func podStatusStyle(status types.PodStatus) tcell.Style {

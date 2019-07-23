@@ -11,6 +11,7 @@ type InputLine struct {
 	view    views.View
 	style   tcell.Style
 	value   []rune
+	prompt  []rune
 	content string
 	cursor  int
 
@@ -20,6 +21,12 @@ type InputLine struct {
 // NewInputLine returns new InputLine
 func NewInputLine() *InputLine {
 	return &InputLine{}
+}
+
+// SetPrompt sets the prompt of the input
+func (w *InputLine) SetPrompt(prompt string) {
+	w.prompt = []rune(prompt)
+	w.PostEventWidgetContent(w)
 }
 
 // SetValue sets the value of the input
@@ -54,6 +61,10 @@ func (w *InputLine) Draw() {
 	}
 
 	var x int
+	for _, c := range w.prompt {
+		w.view.SetContent(x, 0, c, nil, w.style)
+		x += runewidth.RuneWidth(c)
+	}
 	for i, c := range w.value {
 		style := w.style
 		if i == w.cursor {
@@ -116,6 +127,7 @@ func (w *InputLine) HandleEvent(ev tcell.Event) bool {
 
 // Size returns the width and height in vertical line.
 func (w *InputLine) Size() (int, int) {
-	width := runewidth.StringWidth(string(w.value))
-	return width + 1, 1
+	width1 := runewidth.StringWidth(string(w.prompt))
+	width2 := runewidth.StringWidth(string(w.value))
+	return width1 + width2 + 1, 1
 }

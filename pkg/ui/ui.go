@@ -49,10 +49,7 @@ type UI struct {
 	pager      *widgets.Pager
 	statusbar  *StatusBar
 
-	mode              Mode
-	podIndex          int
-	selectedContainer int
-
+	mode     Mode
 	listener EventListener
 
 	views.BoxLayout
@@ -147,10 +144,10 @@ func (ui *UI) HandleEvent(ev tcell.Event) bool {
 	case *tcell.EventKey:
 		switch ev.Key() {
 		case tcell.KeyCtrlP:
-			ui.selectPrevPod()
+			ui.pods.SelectPrev()
 			return true
 		case tcell.KeyCtrlN:
-			ui.selectNextPod()
+			ui.pods.SelectNext()
 			return true
 		case tcell.KeyCtrlD:
 			ui.scrollHalfPageDown()
@@ -163,7 +160,7 @@ func (ui *UI) HandleEvent(ev tcell.Event) bool {
 			ui.scrollPageUp()
 			return true
 		case tcell.KeyTab:
-			ui.selectNextContainer()
+			ui.containers.SelectNext()
 			return true
 		case tcell.KeyCtrlC:
 			ui.listener.OnQuit()
@@ -301,37 +298,9 @@ func (ui *UI) DisableFollowMode() {
 	ui.statusbar.SetMode(ModeNormal)
 }
 
-func (ui *UI) selectNextPod() {
-	count := ui.pods.ItemCount()
-	if ui.podIndex+1 >= count {
-		ui.SelectPodAt(0)
-	} else {
-		ui.SelectPodAt(ui.podIndex + 1)
-	}
-}
-
-func (ui *UI) selectPrevPod() {
-	if ui.podIndex == 0 {
-		count := ui.pods.ItemCount()
-		ui.SelectPodAt(count - 1)
-	} else {
-		ui.SelectPodAt(ui.podIndex - 1)
-	}
-}
-
 // SelectPodAt selects a pod by the index
 func (ui *UI) SelectPodAt(index int) {
-	ui.podIndex = index
 	ui.pods.SelectAt(index)
-}
-
-func (ui *UI) selectNextContainer() {
-	index := ui.selectedContainer + 1
-	if index >= ui.containers.TabCount() {
-		index = 0
-	}
-	ui.selectedContainer = index
-	ui.containers.SelectAt(index)
 }
 
 // SelectContainerAt selects a container by the index

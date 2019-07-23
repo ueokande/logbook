@@ -53,6 +53,24 @@ func (w *Tabs) TabCount() int {
 	return len(w.items)
 }
 
+// SelectNext selects next tab of the current
+func (w *Tabs) SelectNext() {
+	index := w.selected + 1
+	if index >= len(w.items) {
+		index = 0
+	}
+	w.SelectAt(index)
+}
+
+// SelectPrev selects previous tab of the current
+func (w *Tabs) SelectPrev() {
+	index := w.selected + 1
+	if index >= len(w.items) {
+		index = 0
+	}
+	w.SelectAt(index)
+}
+
 // Clear clears current tabs.
 func (w *Tabs) Clear() {
 	for _, item := range w.items {

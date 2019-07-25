@@ -292,7 +292,7 @@ func (ui *UI) startFind() {
 	ui.mode = ModeNormal
 	ui.AddWidget(ui.statusbar, 0)
 	ui.RemoveWidget(ui.input)
-	ui.findNext()
+	ui.pager.SetKeyword(ui.keyword)
 }
 
 func (ui *UI) findNext() {

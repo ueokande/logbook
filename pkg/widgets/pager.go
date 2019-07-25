@@ -8,9 +8,10 @@ import (
 // Pager is a Widget with the text and its view port.  It provides a scrollable
 // view if the content size is larger than the actual view.
 type Pager struct {
-	view     views.View
-	viewport views.ViewPort
-	text     views.Text
+	view      views.View
+	viewport  views.ViewPort
+	text      HighlightText
+	highlight string
 
 	views.WidgetWatchers
 }
@@ -99,6 +100,12 @@ func (w *Pager) ClearText() {
 	width, height := w.text.Size()
 	w.viewport.SetContentSize(width, height, true)
 	w.viewport.ValidateView()
+}
+
+// SetKeyword sets the keyword to be highlighted in the pager
+func (w *Pager) SetKeyword(keyword string) {
+	w.text.SetKeyword(keyword)
+	w.PostEventWidgetContent(w)
 }
 
 // Draw draws the Pager

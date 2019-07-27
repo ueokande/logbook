@@ -96,6 +96,7 @@ func (w *Pager) GetScrollYPosition() float64 {
 // ClearText clears current content on the pager.
 func (w *Pager) ClearText() {
 	w.text.SetText("")
+	w.SetKeyword("")
 
 	width, height := w.text.Size()
 	w.viewport.SetContentSize(width, height, true)
@@ -106,6 +107,11 @@ func (w *Pager) ClearText() {
 func (w *Pager) SetKeyword(keyword string) {
 	w.text.SetKeyword(keyword)
 	w.PostEventWidgetContent(w)
+}
+
+// Keyword returns the current keyword in the content
+func (w *Pager) Keyword() string {
+	return w.text.Keyword()
 }
 
 // FindNext finds next keyword in the content.  It returns true if the keyword found.

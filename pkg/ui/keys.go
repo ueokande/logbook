@@ -81,9 +81,11 @@ func (ui *UI) handleKeySelectContainer(ev *tcell.EventKey) bool {
 	switch ev.Key() {
 	case tcell.KeyCtrlP:
 		ui.pods.SelectPrev()
+		ui.pager.SetKeyword("")
 		return true
 	case tcell.KeyCtrlN:
 		ui.pods.SelectNext()
+		ui.pager.SetKeyword("")
 		return true
 	case tcell.KeyTab:
 		ui.containers.SelectNext()
@@ -130,10 +132,10 @@ func (ui *UI) handleKeyFind(ev *tcell.EventKey) bool {
 	case tcell.KeyRune:
 		switch ev.Rune() {
 		case 'n':
-			ui.pager.FindNext()
+			ui.findNext()
 			return true
 		case 'N':
-			ui.pager.FindPrev()
+			ui.findPrev()
 			return true
 		}
 	}

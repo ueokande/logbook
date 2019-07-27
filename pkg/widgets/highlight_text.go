@@ -89,6 +89,11 @@ func (t *HighlightText) SetKeyword(keyword string) {
 	}
 }
 
+// Keyword returns the current keyword in the content
+func (t *HighlightText) Keyword() string {
+	return t.keyword
+}
+
 // SetStyle sets the style of the content
 func (t *HighlightText) SetStyle(style tcell.Style) {
 	t.text.SetStyle(style)

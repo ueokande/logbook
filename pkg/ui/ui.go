@@ -282,6 +282,22 @@ func (ui *UI) enterFindInputMode() {
 	ui.AddWidget(ui.input, 0)
 }
 
+func (ui *UI) findNext() {
+	k := ui.pager.Keyword()
+	if len(k) == 0 {
+		ui.pager.SetKeyword(ui.keyword)
+	}
+	ui.pager.FindNext()
+}
+
+func (ui *UI) findPrev() {
+	k := ui.pager.Keyword()
+	if len(k) == 0 {
+		ui.pager.SetKeyword(ui.keyword)
+	}
+	ui.pager.FindPrev()
+}
+
 func (ui *UI) cancelInput() {
 	ui.mode = ModeNormal
 	ui.RemoveWidget(ui.statusbar)
@@ -289,7 +305,11 @@ func (ui *UI) cancelInput() {
 }
 
 func (ui *UI) startFind() {
-	ui.keyword = ui.input.Value()
+	keyword := ui.input.Value()
+	if len(keyword) > 0 {
+		// Use previous keyword if the input is empty
+		ui.keyword = keyword
+	}
 	ui.mode = ModeNormal
 	ui.AddWidget(ui.statusbar, 0)
 	ui.RemoveWidget(ui.input)

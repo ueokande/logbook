@@ -130,10 +130,10 @@ func (ui *UI) handleKeyFind(ev *tcell.EventKey) bool {
 	case tcell.KeyRune:
 		switch ev.Rune() {
 		case 'n':
-			ui.findNext()
+			ui.pager.FindNext()
 			return true
 		case 'N':
-			ui.findPrev()
+			ui.pager.FindPrev()
 			return true
 		}
 	}

@@ -276,6 +276,7 @@ func (ui *UI) updateScrollStatus() {
 
 func (ui *UI) enterFindInputMode() {
 	ui.input.SetPrompt("/")
+	ui.input.SetValue("")
 	ui.mode = ModeInputFind
 	ui.RemoveWidget(ui.statusbar)
 	ui.AddWidget(ui.input, 0)
@@ -293,14 +294,7 @@ func (ui *UI) startFind() {
 	ui.AddWidget(ui.statusbar, 0)
 	ui.RemoveWidget(ui.input)
 	ui.pager.SetKeyword(ui.keyword)
-}
-
-func (ui *UI) findNext() {
-	panic("TODO: implement")
-}
-
-func (ui *UI) findPrev() {
-	panic("TODO: implement")
+	ui.pager.FindNext()
 }
 
 func podStatusStyle(status types.PodStatus) tcell.Style {

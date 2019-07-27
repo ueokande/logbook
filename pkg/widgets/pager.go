@@ -108,6 +108,40 @@ func (w *Pager) SetKeyword(keyword string) {
 	w.PostEventWidgetContent(w)
 }
 
+// FindNext finds next keyword in the content.  It returns true if the keyword found.
+func (w *Pager) FindNext() bool {
+	count := w.text.HighlightCount()
+	if count == 0 {
+		return false
+	}
+	next := w.text.CurrentHighlight() + 1
+	if next >= count {
+		next = 0
+	}
+	w.text.ActivateHighlight(next)
+	x, y := w.text.HighlightPos(next)
+	w.viewport.Center(x, y)
+	w.PostEventWidgetContent(w)
+	return true
+}
+
+// FindPrev finds previous keyword in the content.  It returns true if the keyword found.
+func (w *Pager) FindPrev() bool {
+	count := w.text.HighlightCount()
+	if count == 0 {
+		return false
+	}
+	next := w.text.CurrentHighlight() - 1
+	if next < 0 {
+		next = count - 1
+	}
+	w.text.ActivateHighlight(next)
+	x, y := w.text.HighlightPos(next)
+	w.viewport.Center(x, y)
+	w.PostEventWidgetContent(w)
+	return true
+}
+
 // Draw draws the Pager
 func (w *Pager) Draw() {
 	if w.view == nil {

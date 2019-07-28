@@ -7,15 +7,6 @@ import (
 	"github.com/gdamore/tcell/views"
 )
 
-// Mode represents a mode on UI
-type Mode int
-
-// UI mode
-const (
-	ModeNormal Mode = iota // Normal mode
-	ModeFollow             // Follow mode
-)
-
 var (
 	styleStatusBarModeNormal = tcell.StyleDefault.Background(tcell.ColorYellowGreen).Foreground(tcell.ColorDarkGreen).Bold(true)
 	styleStatusBarModeFollow = tcell.StyleDefault.Background(tcell.ColorRed).Foreground(tcell.ColorWhite).Bold(true)

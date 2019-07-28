@@ -7,6 +7,16 @@ import (
 	"github.com/ueokande/logbook/pkg/widgets"
 )
 
+// Mode represents a mode on UI
+type Mode int
+
+// UI mode
+const (
+	ModeNormal    Mode = iota // Normal mode
+	ModeFollow                // Follow mode
+	ModeInputFind             // Input find mode
+)
+
 var (
 	stylePodActive  = tcell.StyleDefault.Foreground(tcell.ColorGreen)
 	stylePodError   = tcell.StyleDefault.Foreground(tcell.ColorRed)
@@ -35,15 +45,14 @@ func (l nopListener) OnQuit() {}
 
 // UI is an user interface for the logbook
 type UI struct {
+	input      *widgets.InputLine
 	pods       *widgets.ListView
 	containers *widgets.Tabs
 	pager      *widgets.Pager
 	statusbar  *StatusBar
 
-	follow            bool
-	podIndex          int
-	selectedContainer int
-
+	mode     Mode
+	keyword  string
 	listener EventListener
 
 	views.BoxLayout
@@ -52,6 +61,7 @@ type UI struct {
 // NewUI returns new UI
 func NewUI() *UI {
 	statusbar := NewStatusBar()
+	input := widgets.NewInputLine()
 	pods := widgets.NewListView()
 	line := widgets.NewVerticalLine(tcell.RuneVLine, tcell.StyleDefault)
 	pager := widgets.NewPager()
@@ -69,6 +79,7 @@ func NewUI() *UI {
 	mainLayout.AddWidget(detailLayout, 1)
 
 	ui := &UI{
+		input:      input,
 		pods:       pods,
 		containers: containers,
 		pager:      pager,
@@ -136,51 +147,7 @@ func (ui *UI) HandleEvent(ev tcell.Event) bool {
 			return true
 		}
 	case *tcell.EventKey:
-		switch ev.Key() {
-		case tcell.KeyCtrlP:
-			ui.selectPrevPod()
-			return true
-		case tcell.KeyCtrlN:
-			ui.selectNextPod()
-			return true
-		case tcell.KeyCtrlD:
-			ui.scrollHalfPageDown()
-			return true
-		case tcell.KeyCtrlU:
-			ui.scrollHalfPageUp()
-		case tcell.KeyCtrlB:
-			ui.scrollPageDown()
-		case tcell.KeyCtrlF:
-			ui.scrollPageUp()
-			return true
-		case tcell.KeyTab:
-			ui.selectNextContainer()
-			return true
-		case tcell.KeyCtrlC:
-			ui.listener.OnQuit()
-			return true
-		case tcell.KeyRune:
-			switch ev.Rune() {
-			case 'k':
-				ui.scrollUp()
-				return true
-			case 'j':
-				ui.scrollDown()
-				return true
-			case 'g':
-				ui.scrollToTop()
-				return true
-			case 'G':
-				ui.scrollToBottom()
-				return true
-			case 'f':
-				ui.toggleFollowMode()
-				return true
-			case 'q':
-				ui.listener.OnQuit()
-				return true
-			}
-		}
+		return ui.handleEventKey(ev)
 	}
 	return false
 }
@@ -188,7 +155,7 @@ func (ui *UI) HandleEvent(ev tcell.Event) bool {
 // AddPagerText adds text line into the pager
 func (ui *UI) AddPagerText(line string) {
 	ui.pager.AppendLine(line)
-	if ui.follow {
+	if ui.mode == ModeFollow {
 		ui.pager.ScrollToBottom()
 	}
 	ui.updateScrollStatus()
@@ -207,7 +174,7 @@ func (ui *UI) SetStatusMode(mode Mode) {
 }
 
 func (ui *UI) scrollDown() {
-	if ui.follow {
+	if ui.mode == ModeFollow {
 		return
 	}
 	ui.pager.ScrollDown()
@@ -215,7 +182,7 @@ func (ui *UI) scrollDown() {
 }
 
 func (ui *UI) scrollUp() {
-	if ui.follow {
+	if ui.mode == ModeFollow {
 		return
 	}
 	ui.pager.ScrollUp()
@@ -223,7 +190,7 @@ func (ui *UI) scrollUp() {
 }
 
 func (ui *UI) scrollPageDown() {
-	if ui.follow {
+	if ui.mode == ModeFollow {
 		return
 	}
 	ui.pager.ScrollPageDown()
@@ -231,7 +198,7 @@ func (ui *UI) scrollPageDown() {
 }
 
 func (ui *UI) scrollPageUp() {
-	if ui.follow {
+	if ui.mode == ModeFollow {
 		return
 	}
 	ui.pager.ScrollPageUp()
@@ -239,7 +206,7 @@ func (ui *UI) scrollPageUp() {
 }
 
 func (ui *UI) scrollHalfPageDown() {
-	if ui.follow {
+	if ui.mode == ModeFollow {
 		return
 	}
 	ui.pager.ScrollHalfPageDown()
@@ -247,7 +214,7 @@ func (ui *UI) scrollHalfPageDown() {
 }
 
 func (ui *UI) scrollToTop() {
-	if ui.follow {
+	if ui.mode == ModeFollow {
 		return
 	}
 	ui.pager.ScrollToTop()
@@ -255,7 +222,7 @@ func (ui *UI) scrollToTop() {
 }
 
 func (ui *UI) scrollToBottom() {
-	if ui.follow {
+	if ui.mode == ModeFollow {
 		return
 	}
 	ui.pager.ScrollToBottom()
@@ -263,7 +230,7 @@ func (ui *UI) scrollToBottom() {
 }
 
 func (ui *UI) scrollHalfPageUp() {
-	if ui.follow {
+	if ui.mode == ModeFollow {
 		return
 	}
 	ui.pager.ScrollHalfPageUp()
@@ -271,7 +238,7 @@ func (ui *UI) scrollHalfPageUp() {
 }
 
 func (ui *UI) toggleFollowMode() {
-	if ui.follow {
+	if ui.mode == ModeFollow {
 		ui.DisableFollowMode()
 	} else {
 		ui.EnableFollowMode()
@@ -280,7 +247,7 @@ func (ui *UI) toggleFollowMode() {
 
 // EnableFollowMode enabled follow mode on the pager
 func (ui *UI) EnableFollowMode() {
-	ui.follow = true
+	ui.mode = ModeFollow
 	ui.statusbar.SetMode(ModeFollow)
 	ui.pager.ScrollToBottom()
 	ui.updateScrollStatus()
@@ -288,41 +255,13 @@ func (ui *UI) EnableFollowMode() {
 
 // DisableFollowMode disables follow mode on the pager
 func (ui *UI) DisableFollowMode() {
-	ui.follow = false
+	ui.mode = ModeNormal
 	ui.statusbar.SetMode(ModeNormal)
-}
-
-func (ui *UI) selectNextPod() {
-	count := ui.pods.ItemCount()
-	if ui.podIndex+1 >= count {
-		ui.SelectPodAt(0)
-	} else {
-		ui.SelectPodAt(ui.podIndex + 1)
-	}
-}
-
-func (ui *UI) selectPrevPod() {
-	if ui.podIndex == 0 {
-		count := ui.pods.ItemCount()
-		ui.SelectPodAt(count - 1)
-	} else {
-		ui.SelectPodAt(ui.podIndex - 1)
-	}
 }
 
 // SelectPodAt selects a pod by the index
 func (ui *UI) SelectPodAt(index int) {
-	ui.podIndex = index
 	ui.pods.SelectAt(index)
-}
-
-func (ui *UI) selectNextContainer() {
-	index := ui.selectedContainer + 1
-	if index >= ui.containers.TabCount() {
-		index = 0
-	}
-	ui.selectedContainer = index
-	ui.containers.SelectAt(index)
 }
 
 // SelectContainerAt selects a container by the index
@@ -333,6 +272,49 @@ func (ui *UI) SelectContainerAt(index int) {
 func (ui *UI) updateScrollStatus() {
 	y := ui.pager.GetScrollYPosition()
 	ui.statusbar.SetScroll(int(y * 100))
+}
+
+func (ui *UI) enterFindInputMode() {
+	ui.input.SetPrompt("/")
+	ui.input.SetValue("")
+	ui.mode = ModeInputFind
+	ui.RemoveWidget(ui.statusbar)
+	ui.AddWidget(ui.input, 0)
+}
+
+func (ui *UI) findNext() {
+	k := ui.pager.Keyword()
+	if len(k) == 0 {
+		ui.pager.SetKeyword(ui.keyword)
+	}
+	ui.pager.FindNext()
+}
+
+func (ui *UI) findPrev() {
+	k := ui.pager.Keyword()
+	if len(k) == 0 {
+		ui.pager.SetKeyword(ui.keyword)
+	}
+	ui.pager.FindPrev()
+}
+
+func (ui *UI) cancelInput() {
+	ui.mode = ModeNormal
+	ui.RemoveWidget(ui.statusbar)
+	ui.AddWidget(ui.input, 0)
+}
+
+func (ui *UI) startFind() {
+	keyword := ui.input.Value()
+	if len(keyword) > 0 {
+		// Use previous keyword if the input is empty
+		ui.keyword = keyword
+	}
+	ui.mode = ModeNormal
+	ui.AddWidget(ui.statusbar, 0)
+	ui.RemoveWidget(ui.input)
+	ui.pager.SetKeyword(ui.keyword)
+	ui.pager.FindNext()
 }
 
 func podStatusStyle(status types.PodStatus) tcell.Style {

@@ -34,6 +34,9 @@ Flags:
 - <kbd>G</kbd>: Scroll to bottom
 - <kbd>g</kbd>: Scroll to top
 - <kbd>Tab</kbd>: Switch containers
+- <kbd>/</kbd>: Search forward for matching line.
+- <kbd>n</kbd>: Repeat previous search.
+- <kbd>N</kbd>: Repeat previous search in reverse direction.
 - <kbd>q</kbd>: Quit
 
 ## License

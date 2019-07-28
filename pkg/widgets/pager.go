@@ -8,9 +8,10 @@ import (
 // Pager is a Widget with the text and its view port.  It provides a scrollable
 // view if the content size is larger than the actual view.
 type Pager struct {
-	view     views.View
-	viewport views.ViewPort
-	text     views.Text
+	view      views.View
+	viewport  views.ViewPort
+	text      HighlightText
+	highlight string
 
 	views.WidgetWatchers
 }
@@ -19,18 +20,12 @@ type Pager struct {
 func NewPager() *Pager {
 	w := &Pager{}
 	w.text.SetView(&w.viewport)
-	w.text.SetStyle(tcell.StyleDefault)
 	return w
 }
 
 // AppendLine adds the line into the pager
 func (w *Pager) AppendLine(line string) {
-	text := w.text.Text()
-	if len(text) > 0 {
-		text += "\n"
-	}
-	text += line
-	w.text.SetText(text)
+	w.text.AppendLine(line)
 
 	width, height := w.text.Size()
 	w.viewport.SetContentSize(width, height, true)
@@ -94,11 +89,56 @@ func (w *Pager) GetScrollYPosition() float64 {
 
 // ClearText clears current content on the pager.
 func (w *Pager) ClearText() {
-	w.text.SetText("")
+	w.text.ClearText()
 
 	width, height := w.text.Size()
 	w.viewport.SetContentSize(width, height, true)
 	w.viewport.ValidateView()
+}
+
+// SetKeyword sets the keyword to be highlighted in the pager
+func (w *Pager) SetKeyword(keyword string) {
+	w.text.SetKeyword(keyword)
+	w.PostEventWidgetContent(w)
+}
+
+// Keyword returns the current keyword in the content
+func (w *Pager) Keyword() string {
+	return w.text.Keyword()
+}
+
+// FindNext finds next keyword in the content.  It returns true if the keyword found.
+func (w *Pager) FindNext() bool {
+	count := w.text.HighlightCount()
+	if count == 0 {
+		return false
+	}
+	next := w.text.CurrentHighlight() + 1
+	if next >= count {
+		next = 0
+	}
+	w.text.ActivateHighlight(next)
+	x, y := w.text.HighlightPos(next)
+	w.viewport.Center(x, y)
+	w.PostEventWidgetContent(w)
+	return true
+}
+
+// FindPrev finds previous keyword in the content.  It returns true if the keyword found.
+func (w *Pager) FindPrev() bool {
+	count := w.text.HighlightCount()
+	if count == 0 {
+		return false
+	}
+	next := w.text.CurrentHighlight() - 1
+	if next < 0 {
+		next = count - 1
+	}
+	w.text.ActivateHighlight(next)
+	x, y := w.text.HighlightPos(next)
+	w.viewport.Center(x, y)
+	w.PostEventWidgetContent(w)
+	return true
 }
 
 // Draw draws the Pager

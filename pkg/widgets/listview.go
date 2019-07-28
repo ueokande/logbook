@@ -95,6 +95,24 @@ func (w *ListView) getItemIndex(name string) int {
 	return -1
 }
 
+// SelectNext selects next item of the current
+func (w *ListView) SelectNext() {
+	index := w.selected + 1
+	if index >= len(w.items) {
+		index = 0
+	}
+	w.SelectAt(index)
+}
+
+// SelectPrev selects previous item of the current
+func (w *ListView) SelectPrev() {
+	index := w.selected - 1
+	if index < 0 {
+		index = len(w.items) - 1
+	}
+	w.SelectAt(index)
+}
+
 // SelectAt selects nth items by the index.
 func (w *ListView) SelectAt(index int) {
 	if index == w.selected {

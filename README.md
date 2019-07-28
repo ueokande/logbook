@@ -6,7 +6,7 @@ Logbook is a real-time log viewer for Kubernetes.
 
 ## Install
 
-Logbook requires Go compiler:
+Download a latest version of the binary from releases, or use `go get` as follows:
 
 ```console
 $ go get -u github.com/ueokande/logbook
@@ -44,3 +44,5 @@ Flags:
 ## License
 
 MIT
+
+[releases]: https://github.com/ueokande/logbook/releases

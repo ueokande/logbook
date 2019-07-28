@@ -108,6 +108,14 @@ func (ui *UI) handleKeyScroll(ev *tcell.EventKey) bool {
 	case tcell.KeyCtrlF:
 		ui.scrollPageUp()
 		return true
+	case tcell.KeyUp:
+		ui.scrollUp()
+	case tcell.KeyDown:
+		ui.scrollDown()
+	case tcell.KeyRight:
+		ui.scrollHaftPageRight()
+	case tcell.KeyLeft:
+		ui.scrollHalfPageLeft()
 	case tcell.KeyRune:
 		switch ev.Rune() {
 		case 'k':
@@ -121,6 +129,12 @@ func (ui *UI) handleKeyScroll(ev *tcell.EventKey) bool {
 			return true
 		case 'G':
 			ui.scrollToBottom()
+			return true
+		case 'h':
+			ui.scrollHalfPageLeft()
+			return true
+		case 'l':
+			ui.scrollHaftPageRight()
 			return true
 		}
 	}

@@ -54,6 +54,18 @@ func (w *Pager) ScrollHalfPageUp() {
 	w.viewport.ScrollUp(vh / 2)
 }
 
+// ScrollHalfPageLeft scrolls left by half-width of the screen
+func (w *Pager) ScrollHalfPageLeft() {
+	vw, _ := w.view.Size()
+	w.viewport.ScrollLeft(vw / 2)
+}
+
+// ScrollHalfPageRight scrolls right by half-width of the screen.
+func (w *Pager) ScrollHalfPageRight() {
+	vw, _ := w.view.Size()
+	w.viewport.ScrollRight(vw / 2)
+}
+
 // ScrollPageDown scrolls down by the height of the screen.
 func (w *Pager) ScrollPageDown() {
 	_, vh := w.view.Size()

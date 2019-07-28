@@ -237,6 +237,22 @@ func (ui *UI) scrollHalfPageUp() {
 	ui.updateScrollStatus()
 }
 
+func (ui *UI) scrollHalfPageLeft() {
+	if ui.mode == ModeFollow {
+		return
+	}
+	ui.pager.ScrollHalfPageLeft()
+	ui.updateScrollStatus()
+}
+
+func (ui *UI) scrollHaftPageRight() {
+	if ui.mode == ModeFollow {
+		return
+	}
+	ui.pager.ScrollHalfPageRight()
+	ui.updateScrollStatus()
+}
+
 func (ui *UI) toggleFollowMode() {
 	if ui.mode == ModeFollow {
 		ui.DisableFollowMode()

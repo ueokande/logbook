@@ -26,6 +26,8 @@ Flags:
 - <kbd>Ctrl</kbd>+<kbd>p</kbd>: Scroll previous pod
 - <kbd>j</kbd>: Scroll down
 - <kbd>k</kbd>: Scroll up
+- <kbd>h</kbd>: Scroll left
+- <kbd>l</kbd>: Scroll right
 - <kbd>f</kbd>: Enable and disable follow mode
 - <kbd>Ctrl</kbd>+<kbd>D</kbd>: Scroll half-page down
 - <kbd>Ctrl</kbd>+<kbd>U</kbd>: Scroll half-page up

@@ -20,18 +20,12 @@ type Pager struct {
 func NewPager() *Pager {
 	w := &Pager{}
 	w.text.SetView(&w.viewport)
-	w.text.SetStyle(tcell.StyleDefault)
 	return w
 }
 
 // AppendLine adds the line into the pager
 func (w *Pager) AppendLine(line string) {
-	text := w.text.Text()
-	if len(text) > 0 {
-		text += "\n"
-	}
-	text += line
-	w.text.SetText(text)
+	w.text.AppendLine(line)
 
 	width, height := w.text.Size()
 	w.viewport.SetContentSize(width, height, true)
@@ -95,8 +89,7 @@ func (w *Pager) GetScrollYPosition() float64 {
 
 // ClearText clears current content on the pager.
 func (w *Pager) ClearText() {
-	w.text.SetText("")
-	w.SetKeyword("")
+	w.text.ClearText()
 
 	width, height := w.text.Size()
 	w.viewport.SetContentSize(width, height, true)

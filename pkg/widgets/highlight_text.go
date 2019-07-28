@@ -19,7 +19,7 @@ var styleHighlightCurrent = tcell.StyleDefault.Background(tcell.ColorYellow)
 type HighlightText struct {
 	highlights []int
 	current    int
-	keyword    string
+	keyword    []rune
 
 	text views.Text
 	views.WidgetWatchers
@@ -45,32 +45,48 @@ func (t *HighlightText) HandleEvent(ev tcell.Event) bool {
 	return t.text.HandleEvent(ev)
 }
 
-// SetText sets the text for the HighlightText
-func (t *HighlightText) SetText(s string) {
-	t.text.SetText(s)
-	t.SetKeyword(t.keyword)
+// AppendLine appends the line into the content
+func (t *HighlightText) AppendLine(line string) {
+	text := t.text.Text()
+	if len(text) > 0 {
+		text += "\n"
+	}
+	text += line
+	t.text.SetText(text)
+
+	t.resetHighlights()
+
 	t.PostEventWidgetContent(t)
 }
 
-// Text returns the current text of the HighlightText
-func (t *HighlightText) Text() string {
-	return string(t.text.Text())
+// ClearText clears current content and highlights
+func (t *HighlightText) ClearText() {
+	t.text.SetText("")
+	t.keyword = nil
+	t.current = -1
+	t.highlights = nil
 }
 
 // SetKeyword sets the keyword to be highlighted in the content
 func (t *HighlightText) SetKeyword(keyword string) {
-	t.keyword = keyword
+	t.keyword = []rune(keyword)
 	t.current = -1
 	t.text.SetStyle(t.text.Style())
-	t.highlights = nil
 	if len(keyword) == 0 {
 		return
 	}
 
-	style := t.text.Style().Reverse(true)
+	t.resetHighlights()
+	t.PostEventWidgetContent(t)
+}
+
+func (t *HighlightText) resetHighlights() {
+	t.highlights = nil
+
 	str := t.text.Text()
+	keyword := string(t.keyword)
 	var x int
-	for {
+	for len(keyword) > 0 {
 		i := strings.Index(str, keyword)
 		if i == -1 {
 			break
@@ -81,22 +97,20 @@ func (t *HighlightText) SetKeyword(keyword string) {
 		x += i + len(keyword)
 	}
 
-	runes := []rune(keyword)
-	for _, start := range t.highlights {
-		for i := range runes {
-			t.text.SetStyleAt(start+i, style)
+	for i, start := range t.highlights {
+		style := t.text.Style().Reverse(true)
+		if i == t.current {
+			style = styleHighlightCurrent
+		}
+		for offset := range t.keyword {
+			t.text.SetStyleAt(start+offset, style)
 		}
 	}
 }
 
 // Keyword returns the current keyword in the content
 func (t *HighlightText) Keyword() string {
-	return t.keyword
-}
-
-// SetStyle sets the style of the content
-func (t *HighlightText) SetStyle(style tcell.Style) {
-	t.text.SetStyle(style)
+	return string(t.keyword)
 }
 
 // Resize is called when the View changes sizes.
@@ -136,13 +150,8 @@ func (t *HighlightText) ActivateHighlight(index int) {
 	if index < 0 || index > len(t.highlights) {
 		panic("index out of range")
 	}
-	t.SetKeyword(t.keyword)
 	t.current = index
-
-	pos := t.highlights[index]
-	for i := pos; i < pos+len(t.keyword); i++ {
-		t.text.SetStyleAt(i, styleHighlightCurrent)
-	}
+	t.resetHighlights()
 	t.PostEventWidgetContent(t)
 }
 

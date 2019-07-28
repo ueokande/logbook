@@ -122,6 +122,12 @@ func (ui *UI) handleKeyScroll(ev *tcell.EventKey) bool {
 		case 'G':
 			ui.scrollToBottom()
 			return true
+		case 'h':
+			ui.scrollHalfPageLeft()
+			return true
+		case 'l':
+			ui.scrollHaftPageRight()
+			return true
 		}
 	}
 	return false

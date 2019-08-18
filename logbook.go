@@ -92,7 +92,7 @@ func (app *App) StartTailLog(namespace, pod, container string) {
 		for log := range logs {
 			app.PostFunc(func() {
 				for line := range ch {
-					app.ui.AddPagerText(line)
+					app.ui.AddPagerTexts([]string{line})
 					break
 				}
 			})

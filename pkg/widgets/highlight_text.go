@@ -45,13 +45,15 @@ func (t *HighlightText) HandleEvent(ev tcell.Event) bool {
 	return t.text.HandleEvent(ev)
 }
 
-// AppendLine appends the line into the content
-func (t *HighlightText) AppendLine(line string) {
+// AppendLines appends the lines into the content
+func (t *HighlightText) AppendLines(lines []string) {
 	text := t.text.Text()
 	if len(text) > 0 {
 		text += "\n"
 	}
-	text += line
+	for _, l := range lines {
+		text += l
+	}
 	t.text.SetText(text)
 
 	t.resetHighlights()

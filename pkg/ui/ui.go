@@ -152,9 +152,9 @@ func (ui *UI) HandleEvent(ev tcell.Event) bool {
 	return false
 }
 
-// AddPagerText adds text line into the pager
-func (ui *UI) AddPagerText(line string) {
-	ui.pager.AppendLine(line)
+// AddPagerTexts adds text lines into the pager
+func (ui *UI) AddPagerTexts(lines []string) {
+	ui.pager.AppendLines(lines)
 	if ui.mode == ModeFollow {
 		ui.pager.ScrollToBottom()
 	}

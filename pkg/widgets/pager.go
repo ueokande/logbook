@@ -23,9 +23,9 @@ func NewPager() *Pager {
 	return w
 }
 
-// AppendLine adds the line into the pager
-func (w *Pager) AppendLine(line string) {
-	w.text.AppendLine(line)
+// AppendLines adds the lines into the pager
+func (w *Pager) AppendLines(lines []string) {
+	w.text.AppendLines(lines)
 
 	width, height := w.text.Size()
 	w.viewport.SetContentSize(width, height, true)

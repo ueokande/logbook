@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"time"
 
 	"github.com/gdamore/tcell/views"
 	"github.com/ueokande/logbook/pkg/k8s"
@@ -86,21 +87,21 @@ func (app *App) StartTailLog(namespace, pod, container string) {
 			return err
 		}
 
-		// make channel to guarantee line order of logs
-		ch := make(chan string)
-		defer close(ch)
-		for log := range logs {
-			app.PostFunc(func() {
-				for line := range ch {
-					app.ui.AddPagerTexts([]string{line})
-					break
-				}
-			})
-			select {
-			case ch <- log:
-			case <-ctx.Done():
-				return nil
+		b := NewTimeBuffer(100*time.Millisecond, 100)
+		go func() {
+			defer b.Close()
+
+			for log := range logs {
+				b.Write(log)
 			}
+		}()
+
+		// make channel to guarantee line order of logs
+		for lines := range b.Flushed() {
+			lines := lines
+			app.PostFunc(func() {
+				app.ui.AddPagerTexts(lines)
+			})
 		}
 		return nil
 	})

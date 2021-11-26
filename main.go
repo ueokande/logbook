@@ -56,7 +56,7 @@ func main() {
 			config.Namespace = context.Namespace
 		}
 		if len(p.namespace) > 0 {
-			config.Namespace = context.Namespace
+			config.Namespace = p.namespace
 		}
 
 		app := NewApp(client, config)
